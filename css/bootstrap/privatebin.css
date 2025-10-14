@@ -130,10 +130,6 @@ li.L8 {
 	align-items: center;
 }
 
-.modal .modal-content button {
-	margin: 0.5em 0;
-}
-
 /* right-to-left overrides */
 html[dir="rtl"] .checkbox label {
 	padding-left: inherit;
@@ -181,4 +177,10 @@ html[dir="rtl"] #prettyMessageCopyBtn {
 
 #copyShortcutHint {
 	margin-bottom: 5px;
+}
+
+.modal-body-settings {
+	display: flex;
+	flex-direction: column;
+	align-items: normal;
 }

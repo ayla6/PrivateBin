@@ -73,7 +73,7 @@ class FormatV2
         }
 
         // - algorithm, must be age
-        if ($cipherParams[5] !== "age") {
+        if (!($cipherParams[5] === "age" || $cipherParams[5] === "ageid")) {
             return false;
         }
         // - compression

@@ -40,15 +40,14 @@ class Configuration
             "opendiscussion" => false,
             "discussiondatedisplay" => true,
             "password" => true,
-            "fileupload" => false,
+            "fileupload" => true,
             "burnafterreadingselected" => false,
             "defaultformatter" => "plaintext",
             "syntaxhighlightingtheme" => "",
             "sizelimit" => 10485760,
             "templateselection" => false,
-            "template" => "bootstrap5",
+            "template" => "bootstrap-dark",
             "availabletemplates" => [
-                "bootstrap5",
                 "bootstrap",
                 "bootstrap-page",
                 "bootstrap-dark",
@@ -77,7 +76,9 @@ class Configuration
         "expire_options" => [
             "5min" => 300,
             "10min" => 600,
+            "30min" => 1800,
             "1hour" => 3600,
+            "6hours" => 21600,
             "1day" => 86400,
             "1week" => 604800,
             "1month" => 2592000,
@@ -131,8 +132,8 @@ class Configuration
                 "sha512-rGXYUpIqbFoHAgBXZ0UlJBdNAIMOC9EQ67MG0X46D5uRB8LvwzgKirbSQRGdYfk8I2jsUcm+tvHXYboUnC6DUg==",
             "js/prettify.js" =>
                 "sha512-puO0Ogy++IoA2Pb9IjSxV1n4+kQkKXYAEUtVzfZpQepyDPyXk8hokiYDS7ybMogYlyyEIwMLpZqVhCkARQWLMg==",
-            //"js/privatebin.js" =>
-            //    "rj7FrI6mcne4Ts6jVXHTqs2jep+WVWB763JyQs9GMksKwrI3Z/0Mc5Oas5VWDX/HvkG44ko5mv1EsMVlMRRHBg==",
+            "js/privatebin.js" =>
+                "KujjwiosDxyefzn3YHw3t25YUEliMwRIcSLa/A6AwM7+WORLZYkHpINlox6ExsB7mSim+cZmfQZfgZFb2hNTJg==",
             "js/purify-3.2.7.js" =>
                 "sha512-2H9wzIiPQCOsh7T3hK/WuqWIwSQ2oYq91doyrp1LcnXuPyxzehopypz16wiWqxmMjx2cVIqAWCoRp1gNZAsFEQ==",
             "js/showdown-2.1.0.js" =>

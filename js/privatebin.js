@@ -42,6 +42,10 @@ jQuery(document).ready(function () {
 jQuery.PrivateBin = (function ($) {
     "use strict";
 
+    let publicKeys = [];
+    let privateKey;
+    let ownPublicKey;
+
     /**
      * zlib library interface
      *
@@ -66,7 +70,6 @@ jQuery.PrivateBin = (function ($) {
      * @returns A new image buffer with EXIF removed, will return `null` if
      *   image is unsupported, or if there's nothing to remove.
      */
-    /*eslint complexity: ["error", 36]*/
     function removeExif(buf) {
         const blen = buf.byteLength;
 
@@ -772,16 +775,6 @@ jQuery.PrivateBin = (function ($) {
             baseUri = null;
         };
 
-        /**
-         * check if bootstrap5 object detected
-         *
-         * @name Helper.isBootstrap5
-         * @returns {Boolean}
-         */
-        me.isBootstrap5 = function () {
-            return typeof bootstrap !== "undefined";
-        };
-
         return me;
     })();
 
@@ -1327,7 +1320,7 @@ jQuery.PrivateBin = (function ($) {
          * @throws {string}
          * @return {ArrayBuffer} data
          */
-        async function compress(message, mode, zlib) {
+        function compress(message, mode, zlib) {
             message = stringToArraybuffer(utf16To8(message));
             if (mode === "zlib") {
                 if (typeof zlib === "undefined") {
@@ -1351,7 +1344,7 @@ jQuery.PrivateBin = (function ($) {
          * @throws {string}
          * @return {string} message
          */
-        async function decompress(data, mode, zlib) {
+        function decompress(data, mode, zlib) {
             if (mode === "zlib") {
                 if (typeof zlib === "undefined") {
                     throw "Error decompressing document, your browser does not support WebAssembly. Please use another browser to view this document.";
@@ -1394,6 +1387,9 @@ jQuery.PrivateBin = (function ($) {
          * @return {array}  encrypted message in base64 encoding & adata containing encryption spec
          */
         me.cipher = async function (key, password, message, adata) {
+            const idmode =
+                TopNav.getUseIdentities() && (publicKeys[0] || privateKey);
+
             let zlib = await z;
             const compression =
                     typeof zlib === "undefined"
@@ -1405,7 +1401,7 @@ jQuery.PrivateBin = (function ($) {
                     null, // iterations
                     null, // key size
                     null, // tag size
-                    "age", // algorithm
+                    idmode ? "ageid" : "age", // algorithm
                     null, // algorithm mode
                     compression, // compression
                 ],
@@ -1423,14 +1419,38 @@ jQuery.PrivateBin = (function ($) {
 
             // finally, encrypt message
             const e = new age.Encrypter();
-            e.setPassphrase(key + password);
+            if (idmode) {
+                const e2 = new age.Encrypter();
+                if (publicKeys[0]) {
+                    for (let i = 0; i < publicKeys.length; ++i) {
+                        e2.addRecipient(publicKeys[i]);
+                    }
+                }
+                e2.addRecipient(ownPublicKey);
+                message = btoa(
+                    arraybufferToString(
+                        await e2
+                            .encrypt(
+                                new Uint8Array(
+                                    compress(message, compression, zlib),
+                                ),
+                            )
+                            .catch(Alert.showError),
+                    ),
+                );
+            }
+            e.setPassphrase(idmode ? key : key + password);
             return [
                 btoa(
                     arraybufferToString(
                         await e
                             .encrypt(
                                 new Uint8Array(
-                                    await compress(message, compression, zlib),
+                                    compress(
+                                        message,
+                                        idmode ? null : compression,
+                                        zlib,
+                                    ),
                                 ),
                             )
                             .catch(Alert.showError),
@@ -1478,12 +1498,22 @@ jQuery.PrivateBin = (function ($) {
                 plaintext = await d.decrypt(
                     stringToArraybuffer(atob(cipherMessage)),
                 );
+
+                if (spec[5] === "ageid") {
+                    const d2 = new age.Decrypter();
+                    d2.addIdentity(privateKey);
+                    plaintext = await d2.decrypt(
+                        stringToArraybuffer(
+                            atob(arraybufferToString(plaintext)),
+                        ),
+                    );
+                }
             } catch (err) {
                 console.error(err);
                 return "";
             }
             try {
-                return await decompress(plaintext, spec[7], zlib);
+                return decompress(plaintext, spec[7], zlib);
             } catch (err) {
                 Alert.showError(err);
                 return err;
@@ -2428,7 +2458,6 @@ jQuery.PrivateBin = (function ($) {
 
         let $passwordDecrypt,
             $passwordModal,
-            bootstrap5PasswordModal = null,
             password = "";
 
         /**
@@ -2446,11 +2475,7 @@ jQuery.PrivateBin = (function ($) {
             password = $passwordDecrypt.val();
 
             // hide modal
-            if (bootstrap5PasswordModal) {
-                bootstrap5PasswordModal.hide();
-            } else {
-                $passwordModal.modal("hide");
-            }
+            $passwordModal.modal("hide");
 
             PasteDecrypter.run();
         }
@@ -2490,11 +2515,7 @@ jQuery.PrivateBin = (function ($) {
         me.requestPassword = function () {
             // show new bootstrap method (if available)
             if ($passwordModal.length !== 0) {
-                if (bootstrap5PasswordModal) {
-                    bootstrap5PasswordModal.show();
-                } else {
-                    $passwordModal.modal("show");
-                }
+                $passwordModal.modal("show");
                 return;
             }
 
@@ -2550,17 +2571,7 @@ jQuery.PrivateBin = (function ($) {
                     keyboard: false,
                     show: false,
                 };
-                if (
-                    typeof bootstrap !== "undefined" &&
-                    bootstrap.Tooltip.VERSION
-                ) {
-                    bootstrap5PasswordModal = new bootstrap.Modal(
-                        $passwordModal[0],
-                        disableClosingConfig,
-                    );
-                } else {
-                    $passwordModal.modal(disableClosingConfig);
-                }
+                $passwordModal.modal(disableClosingConfig);
                 $passwordModal.on("shown.bs.modal", () => {
                     $passwordDecrypt.focus();
                 });
@@ -3985,6 +3996,8 @@ jQuery.PrivateBin = (function ($) {
             $newButton,
             $openDiscussion,
             $openDiscussionOption,
+            $useIdentities,
+            $useIdentitiesOption,
             $password,
             $passwordInput,
             $rawTextButton,
@@ -4094,6 +4107,21 @@ jQuery.PrivateBin = (function ($) {
             // hide UI for selected files
             // our up-to-date jQuery can handle it :)
             $fileWrap.find("input").val("");
+        }
+
+        /**
+         * when "use ids" is checked, hide passwords
+         *
+         * @name   TopNav.changeUseIds
+         * @private
+         * @function
+         */
+        function changeUseIds() {
+            if (me.getUseIdentities()) {
+                $password.parent().hide();
+            } else {
+                $password.parent().show();
+            }
         }
 
         /**
@@ -4354,11 +4382,6 @@ jQuery.PrivateBin = (function ($) {
                     dateStyle: "long",
                     timeStyle: "long",
                 };
-                const bootstrap5EmailConfirmModal =
-                    typeof bootstrap !== "undefined" &&
-                    bootstrap.Tooltip.VERSION
-                        ? new bootstrap.Modal($emailconfirmmodal[0])
-                        : null;
 
                 function sendEmailAndHideModal() {
                     const emailBody = templateEmailBody(
@@ -4369,11 +4392,7 @@ jQuery.PrivateBin = (function ($) {
                         ),
                         isBurnafterreading,
                     );
-                    if (bootstrap5EmailConfirmModal) {
-                        bootstrap5EmailConfirmModal.hide();
-                    } else {
-                        $emailconfirmmodal.modal("hide");
-                    }
+                    $emailconfirmmodal.modal("hide");
                     triggerEmailSend(emailBody);
                 }
 
@@ -4392,11 +4411,7 @@ jQuery.PrivateBin = (function ($) {
                         sendEmailAndHideModal();
                     },
                 );
-                if (bootstrap5EmailConfirmModal) {
-                    bootstrap5EmailConfirmModal.show();
-                } else {
-                    $emailconfirmmodal.modal("show");
-                }
+                $emailconfirmmodal.modal("show");
             } else {
                 triggerEmailSend(templateEmailBody(null, isBurnafterreading));
             }
@@ -4471,6 +4486,7 @@ jQuery.PrivateBin = (function ($) {
             $formatter.removeClass("hidden");
             $newButton.removeClass("hidden");
             $openDiscussionOption.removeClass("hidden");
+            $useIdentitiesOption.removeClass("hidden");
             $password.removeClass("hidden");
             $sendButton.removeClass("hidden");
 
@@ -4736,6 +4752,17 @@ jQuery.PrivateBin = (function ($) {
         };
 
         /**
+         * returns the state of the use identities checkbox
+         *
+         * @name   TopNav.getUseIdentities
+         * @function
+         * @return {bool}
+         */
+        me.getUseIdentities = function () {
+            return $useIdentities.prop("checked");
+        };
+
+        /**
          * returns the state of the discussion checkbox
          *
          * @name   TopNav.getOpenDiscussion
@@ -4792,11 +4819,7 @@ jQuery.PrivateBin = (function ($) {
             // visually indicate file uploaded
             const $attachDropdownToggle = $attach.children(".dropdown-toggle");
             if ($attachDropdownToggle.attr("aria-expanded") === "false") {
-                if (Helper.isBootstrap5()) {
-                    new bootstrap.Dropdown($attachDropdownToggle).toggle();
-                } else {
-                    $attachDropdownToggle.click();
-                }
+                $attachDropdownToggle.click();
             }
             $fileWrap.addClass("highlight");
             setTimeout(function () {
@@ -4846,6 +4869,8 @@ jQuery.PrivateBin = (function ($) {
             $newButton = $("#newbutton");
             $openDiscussion = $("#opendiscussion");
             $openDiscussionOption = $("#opendiscussionoption");
+            $useIdentities = $("#useidentities");
+            $useIdentitiesOption = $("#useidentitiesoption");
             $password = $("#password");
             $passwordInput = $("#passwordinput");
             $rawTextButton = $("#rawtextbutton");
@@ -4864,6 +4889,7 @@ jQuery.PrivateBin = (function ($) {
             // bind events
             $burnAfterReading.change(changeBurnAfterReading);
             $openDiscussionOption.change(changeOpenDiscussion);
+            $useIdentities.change(changeUseIds);
             $newButton.click(clickNewPaste);
             $sendButton.click(PasteEncrypter.sendPaste);
             $cloneButton.click(Controller.clonePaste);
@@ -4880,15 +4906,9 @@ jQuery.PrivateBin = (function ($) {
             $("ul.dropdown-menu li a", $("#formatter").parent()).click(
                 updateFormat,
             );
-            // bootstrap5 & page drop downs
-            $("#pasteExpiration").on("change", function () {
-                pasteExpiration = Model.getExpirationDefault();
-            });
-            $("#pasteFormatter").on("change", function () {
-                PasteViewer.setFormat(Model.getFormatDefault());
-            });
 
             // initiate default state of checkboxes
+            changeUseIds();
             changeBurnAfterReading();
             changeOpenDiscussion();
 
@@ -6003,6 +6023,165 @@ jQuery.PrivateBin = (function ($) {
     })();
 
     /**
+     * Settings
+     *
+     * @name Settings
+     * @class
+     */
+    const Settings = (function () {
+        const me = {};
+
+        let privateKeyTextArea,
+            publicKeysTextArea,
+            saveButton,
+            settingsButton,
+            generateAgeKeyButton,
+            copyOwnPublicKeyButton,
+            copyOwnPrivateKeyButton;
+
+        /**
+         * Load settings from localStorage
+         *
+         * @name SettingsModal.loadSettingsFromStorage
+         * @private
+         * @function
+         */
+        async function loadSettingsFromStorage() {
+            const privateKeyText = localStorage.getItem("privateAgeKey");
+            const publicKeysText = localStorage.getItem("publicAgeKeys");
+
+            privateKey = privateKeyText;
+            ownPublicKey = privateKey
+                ? await age.identityToRecipient(privateKey)
+                : null;
+            publicKeys = publicKeysText.split("\n").map((key) => key.trim());
+
+            if (privateKeyTextArea && privateKeyText) {
+                privateKeyTextArea.val(privateKeyText);
+            }
+            if (publicKeysTextArea && publicKeysText) {
+                publicKeysTextArea.val(publicKeysText);
+            }
+        }
+
+        /**
+         * Save settings to localStorage
+         *
+         * @name SettingsModal.saveSettingsToStorage
+         * @private
+         * @function
+         */
+        async function saveSettingsToStorage() {
+            if (privateKeyTextArea) {
+                localStorage.setItem("privateAgeKey", privateKeyTextArea.val());
+            }
+            if (publicKeysTextArea) {
+                localStorage.setItem("publicAgeKeys", publicKeysTextArea.val());
+            }
+        }
+
+        /**
+         * Generate a random age key
+         *
+         * @name SettingsModal.generateRandomAgeKey
+         * @private
+         * @function
+         */
+
+        async function generateRandomAgeKey() {
+            const identity = await age.generateIdentity();
+
+            if (privateKeyTextArea) {
+                privateKeyTextArea.val(identity);
+            }
+        }
+
+        /**
+         * Copy own public key
+         *
+         * @name SettingsModal.copyOwnPublicKey
+         * @private
+         * @function
+         */
+
+        async function copyOwnPublicKey() {
+            if (privateKeyTextArea && privateKeyTextArea.val()) {
+                navigator.clipboard.writeText(ownPublicKey);
+            }
+        }
+
+        /**
+         * Copy own private key
+         *
+         * @name SettingsModal.copyOwnPrivateKey
+         * @private
+         * @function
+         */
+
+        async function copyOwnPrivateKey() {
+            if (privateKeyTextArea && privateKeyTextArea.val()) {
+                navigator.clipboard.writeText(privateKeyTextArea.val());
+            }
+        }
+
+        /**
+         * Get private age key for decryption
+         *
+         * @name SettingsModal.getPrivateKey
+         * @function
+         * @return {string}
+         */
+        me.getPrivateKey = function () {
+            return localStorage.getItem("privateAgeKey") || "";
+        };
+
+        /**
+         * Get list of public keys for encryption
+         *
+         * @name SettingsModal.getPublicKeys
+         * @function
+         * @return {Array}
+         */
+        me.getPublicKeys = function () {
+            const keys = localStorage.getItem("publicAgeKeys") || "";
+            return keys.split("\n").filter((key) => key.trim() !== "");
+        };
+
+        /**
+         * Initialize
+         *
+         * @name SettingsModal.init
+         * @function
+         */
+        me.init = function () {
+            const modal = $("#settingsmodal");
+            privateKeyTextArea = $("#ageprivatekey");
+            publicKeysTextArea = $("#agepublickeys");
+
+            generateAgeKeyButton = $("#generateagekey");
+            generateAgeKeyButton.on("click", generateRandomAgeKey);
+
+            copyOwnPublicKeyButton = $("#copypublickey");
+            copyOwnPublicKeyButton.on("click", copyOwnPublicKey);
+
+            copyOwnPrivateKeyButton = $("#copyprivatekey");
+            copyOwnPrivateKeyButton.on("click", copyOwnPrivateKey);
+
+            saveButton = $("#savesettings");
+            saveButton.on("click", saveSettingsToStorage);
+
+            settingsButton = $("#settingsbutton");
+            settingsButton.on("click", () => modal.modal("show"));
+
+            modal.on("show.bs.modal", loadSettingsFromStorage);
+
+            loadSettingsFromStorage();
+        };
+
+        return me;
+    })();
+
+    /**
      * (controller) main PrivateBin logic
      *
      * @name   Controller
@@ -6266,6 +6445,7 @@ jQuery.PrivateBin = (function ($) {
             UiHelper.init();
             CopyToClipboard.init();
             PasswordPeek.init();
+            Settings.init();
 
             // check for legacy browsers before going any further
             if (!Legacy.Check.getInit()) {

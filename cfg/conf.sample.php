@@ -27,7 +27,7 @@ opendiscussion = false
 password = true
 
 ; enable or disable the file upload feature, defaults to false
-fileupload = false
+fileupload = true
 
 ; preselect the burn-after-reading feature, defaults to false
 burnafterreadingselected = false
@@ -37,7 +37,7 @@ burnafterreadingselected = false
 defaultformatter = "plaintext"
 
 ; (optional) set a syntax highlighting theme, as found in css/prettify/
-; syntaxhighlightingtheme = "sons-of-obsidian"
+syntaxhighlightingtheme = "sons-of-obsidian"
 
 ; size limit per document or comment in bytes, defaults to 10 Megabytes
 sizelimit = 10000000
@@ -48,7 +48,6 @@ sizelimit = 10000000
 templateselection = false
 
 ; List of available for selection templates when "templateselection" option is enabled
-availabletemplates[] = "bootstrap5"
 availabletemplates[] = "bootstrap"
 availabletemplates[] = "bootstrap-page"
 availabletemplates[] = "bootstrap-dark"
@@ -61,7 +60,7 @@ availabletemplates[] = "bootstrap-compact-page"
 ; which can be combined with "-dark" and "-compact" for "bootstrap-dark-page",
 ; "bootstrap-compact-page" - previews at:
 ; https://privatebin.info/screenshots.html
-; template = "bootstrap5"
+template = "bootstrap-dark"
 
 ; (optional) info text to display
 ; use single, instead of double quotes for HTML attributes
@@ -149,7 +148,9 @@ default = "1week"
 ; or 0 if it should never expire
 5min = 300
 10min = 600
+30min = 1800
 1hour = 3600
+6hour = 21600
 1day = 86400
 1week = 604800
 ; Well this is not *exactly* one month, it's 30 days:

@@ -95,6 +95,32 @@ if (count($class)) {
 	echo ' class="', implode(" ", $class), '"';
 }
 ?>>
+	<div id="settingsmodal" tabindex="-1" class="modal fade" role="dialog" aria-hidden="true">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">Settings</h4>
+				</div>
+				<div class="modal-body modal-body-settings">
+					<div class="form-group">
+						<label for="ageprivatekey">Private Age Key (for decryption):</label>
+						<input id="ageprivatekey" type="password" class="form-control" placeholder="AGE-SECRET-KEY-..."></input>
+					</div>
+					<div class="form-group">
+						<label for="agepublickeys">Public Age Keys (for encryption - one per line):</label>
+						<textarea id="agepublickeys" class="form-control" rows="8" placeholder="age1abc123...&#10;age1def456...&#10;age1ghi789..."></textarea>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+					<button type="button" class="btn btn-default" id="copyprivatekey">Copy Private Key</button>
+					<button type="button" class="btn btn-default" id="copypublickey">Copy Public Key</button>
+					<button type="button" class="btn btn-default" id="generateagekey">New Private Key</button>
+					<button type="button" class="btn btn-primary" id="savesettings">Save</button>
+				</div>
+			</div>
+		</div>
+	</div>
 		<div id="passwordmodal" tabindex="-1" class="modal fade" role="dialog" aria-hidden="true">
 			<div class="modal-dialog" role="document">
 				<div class="modal-content">
@@ -365,20 +391,28 @@ if ($isCpct): ?>
 					</li>
 <?php endif;endif;
 if ($PASSWORD): ?>
-					<li>
-						<div id="password" class="navbar-form hidden">
-							<div class="input-group">
-								<input type="password" id="passwordinput" placeholder="<?php echo I18n::_(
-        	"Password (recommended)",
-        ); ?>" class="form-control input-password" size="23" />
-								<div class="input-group-addon toggle-password" type="button" title="<?php echo I18n::_(
-        	"Show password",
-        ); ?>" aria-label="<?php echo I18n::_("Show password"); ?>">
-									<span class="glyphicon glyphicon-eye-open"></span>
-								</div>
-							</div>
-						</div>
-					</li>
+<li>
+	<div id="useidentitiesoption" class="navbar-text checkbox hidden">
+		<label>
+			<input type="checkbox" id="useidentities" name="useidentities" />
+			<?php echo I18n::_("Age IDs"); ?>
+		</label>
+	</div>
+</li>
+<li>
+	<div id="password" class="navbar-form hidden">
+		<div id="passwordgroup" class="input-group">
+			<input type="password" id="passwordinput" placeholder="<?php echo I18n::_(
+   	"Password (recommended)",
+   ); ?>" class="form-control input-password" size="23" />
+			<div class="input-group-addon toggle-password" type="button" title="<?php echo I18n::_(
+   	"Show password",
+   ); ?>" aria-label="<?php echo I18n::_("Show password"); ?>">
+				<span class="glyphicon glyphicon-eye-open"></span>
+			</div>
+		</div>
+	</div>
+</li>
 <?php endif;
 if ($FILEUPLOAD): ?>
 					<li id="attach" class="hidden dropdown">
@@ -429,6 +463,14 @@ if (!$isCpct): ?>
 					</li>
 <?php endif;
 ?>
+<li>
+	<button id="settingsbutton" type="button" class="btn btn-<?php echo $isDark
+ 	? "warning"
+ 	: "primary"; ?> navbar-btn">
+		<span class="glyphicon glyphicon-cog" aria-hidden="true"></span> <?php echo I18n::_("Settings"),
+  	PHP_EOL; ?>
+	</button>
+</li>
 				</ul>
 				<ul class="nav navbar-nav pull-right">
 <?php if (!empty($LANGUAGESELECTION)): ?>

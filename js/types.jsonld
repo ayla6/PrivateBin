@@ -55,7 +55,7 @@
 	},
 	"Algorithm": {
 		"@type": "so:Text",
-		"@value": ["aes", "age"]
+		"@value": ["age", "ageid]
 	},
 	"Mode": {
 		"@type": "so:Text",
@@ -75,7 +75,7 @@
 	"Expiration": {
 		"@type": "so:Text",
 		"@value": "1week",
-		"@enum": ["5min", "10min", "1hour", "1day", "1week", "1month", "1year", "never"]
+		"@enum": ["5min", "10min", "30min", "1hour", "6hour", "1day", "1week", "1month", "1year", "never"]
 	},
 	"OpenDiscussion": {
 		"@type": "so:Boolean",
