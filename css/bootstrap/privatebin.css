@@ -11,7 +11,14 @@
 @import url("../common.css");
 
 body {
-	padding: 0 0 30px;
+	font-family: "Roboto Flex", "Roboto", sans-serif;
+}
+
+code,
+kbd,
+pre,
+samp {
+	font-family: "JetBrains Mono", monospace;
 }
 
 body.navbar-spacing {
@@ -42,7 +49,8 @@ body.loading {
 	padding: 0;
 }
 
-.dropdown-menu > li > label, .dropdown-menu > li > div {
+.dropdown-menu > li > label,
+.dropdown-menu > li > div {
 	clear: both;
 	display: block;
 	font-weight: normal;
@@ -77,7 +85,14 @@ footer h4 {
 	margin-top: 0;
 }
 
-li.L0, li.L1, li.L2, li.L3, li.L5, li.L6, li.L7, li.L8 {
+li.L0,
+li.L1,
+li.L2,
+li.L3,
+li.L5,
+li.L6,
+li.L7,
+li.L8 {
 	list-style-type: decimal !important;
 }
 
@@ -135,7 +150,8 @@ html[dir="rtl"] #language {
 	margin-right: 8px;
 }
 
-html[dir="rtl"] #deletelink, html[dir="rtl"] #qrcodemodalClose {
+html[dir="rtl"] #deletelink,
+html[dir="rtl"] #qrcodemodalClose {
 	float: left;
 }
 

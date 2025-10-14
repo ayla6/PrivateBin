@@ -1395,8 +1395,6 @@ jQuery.PrivateBin = (function ($) {
          */
         me.cipher = async function (key, password, message, adata) {
             let zlib = await z;
-            // AES in Galois Counter Mode, keysize 256 bit,
-            // authentication tag 128 bit, 10000 iterations in key derivation
             const compression =
                     typeof zlib === "undefined"
                         ? "none" // client lacks support for WASM

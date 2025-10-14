@@ -33,12 +33,12 @@ class FormatV2
      */
     public static function isValid(&$message, $isComment = false)
     {
-        $required_keys = array('adata', 'v', 'ct');
+        $required_keys = ["adata", "v", "ct"];
         if ($isComment) {
-            $required_keys[] = 'pasteid';
-            $required_keys[] = 'parentid';
+            $required_keys[] = "pasteid";
+            $required_keys[] = "parentid";
         } else {
-            $required_keys[] = 'meta';
+            $required_keys[] = "meta";
         }
 
         // Make sure no additionnal keys were added.
@@ -54,67 +54,30 @@ class FormatV2
         }
 
         // Make sure adata is an array.
-        if (!is_array($message['adata'])) {
+        if (!is_array($message["adata"])) {
             return false;
         }
 
-        $cipherParams = $isComment ? $message['adata'] : $message['adata'][0];
+        $cipherParams = $isComment ? $message["adata"] : $message["adata"][0];
 
         // Make sure some fields contain no unsupported values:
         // - version
-        if (!(is_int($message['v']) || is_float($message['v'])) || (float) $message['v'] < 2) {
+        if (!(is_int($message["v"]) || is_float($message["v"])) || (float) $message["v"] < 2) {
             return false;
         }
 
         // Make sure some fields are base64 data:
         // - cipher text
-        if (!($ct = base64_decode($message['ct'], true))) {
+        if (!($ct = base64_decode($message["ct"], true))) {
             return false;
         }
 
-        if ($cipherParams[5] === 'aes') {
-            // - initialization vector
-            if (!base64_decode($cipherParams[0], true)) {
-                return false;
-            }
-            // - salt
-            if (!base64_decode($cipherParams[1], true)) {
-                return false;
-            }
-
-            // Make sure some fields have a reasonable size:
-            // - initialization vector
-            if (strlen($cipherParams[0]) > 24) {
-                return false;
-            }
-            // - salt
-            if (strlen($cipherParams[1]) > 14) {
-                return false;
-            }
-
-            // - iterations, refuse less then 10000 iterations (minimum NIST recommendation)
-            if (!is_int($cipherParams[2]) || $cipherParams[2] <= 10000) {
-                return false;
-            }
-            // - key size
-            if (!in_array($cipherParams[3], array(128, 192, 256), true)) {
-                return false;
-            }
-            // - tag size
-            if (!in_array($cipherParams[4], array(64, 96, 128), true)) {
-                return false;
-            }
-            // - mode
-            if (!in_array($cipherParams[6], array('ctr', 'cbc', 'gcm'), true)) {
-                return false;
-            }
-        }
-        // - algorithm, must be AES
-        else if ($cipherParams[5] !== 'age') {
+        // - algorithm, must be age
+        if ($cipherParams[5] !== "age") {
             return false;
         }
         // - compression
-        if (!in_array($cipherParams[7], array('zlib', 'none'), true)) {
+        if (!in_array($cipherParams[7], ["zlib", "none"], true)) {
             return false;
         }
 
@@ -124,11 +87,12 @@ class FormatV2
         }
 
         // require only the key 'expire' in the metadata of pastes
-        if (!$isComment && (
-            count($message['meta']) === 0 ||
-            !array_key_exists('expire', $message['meta']) ||
-            count($message['meta']) > 1
-        )) {
+        if (
+            !$isComment &&
+            (count($message["meta"]) === 0 ||
+                !array_key_exists("expire", $message["meta"]) ||
+                count($message["meta"]) > 1)
+        ) {
             return false;
         }
 

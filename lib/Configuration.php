@@ -131,8 +131,8 @@ class Configuration
                 "sha512-rGXYUpIqbFoHAgBXZ0UlJBdNAIMOC9EQ67MG0X46D5uRB8LvwzgKirbSQRGdYfk8I2jsUcm+tvHXYboUnC6DUg==",
             "js/prettify.js" =>
                 "sha512-puO0Ogy++IoA2Pb9IjSxV1n4+kQkKXYAEUtVzfZpQepyDPyXk8hokiYDS7ybMogYlyyEIwMLpZqVhCkARQWLMg==",
-            "js/privatebin.js" =>
-                "rj7FrI6mcne4Ts6jVXHTqs2jep+WVWB763JyQs9GMksKwrI3Z/0Mc5Oas5VWDX/HvkG44ko5mv1EsMVlMRRHBg==",
+            //"js/privatebin.js" =>
+            //    "rj7FrI6mcne4Ts6jVXHTqs2jep+WVWB763JyQs9GMksKwrI3Z/0Mc5Oas5VWDX/HvkG44ko5mv1EsMVlMRRHBg==",
             "js/purify-3.2.7.js" =>
                 "sha512-2H9wzIiPQCOsh7T3hK/WuqWIwSQ2oYq91doyrp1LcnXuPyxzehopypz16wiWqxmMjx2cVIqAWCoRp1gNZAsFEQ==",
             "js/showdown-2.1.0.js" =>
