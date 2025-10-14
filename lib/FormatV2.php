@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 /**
  * PrivateBin
  *
@@ -58,53 +60,57 @@ class FormatV2
 
         $cipherParams = $isComment ? $message['adata'] : $message['adata'][0];
 
-        // Make sure some fields are base64 data:
-        // - initialization vector
-        if (!base64_decode($cipherParams[0], true)) {
-            return false;
-        }
-        // - salt
-        if (!base64_decode($cipherParams[1], true)) {
-            return false;
-        }
-        // - cipher text
-        if (!($ct = base64_decode($message['ct'], true))) {
-            return false;
-        }
-
-        // Make sure some fields have a reasonable size:
-        // - initialization vector
-        if (strlen($cipherParams[0]) > 24) {
-            return false;
-        }
-        // - salt
-        if (strlen($cipherParams[1]) > 14) {
-            return false;
-        }
-
         // Make sure some fields contain no unsupported values:
         // - version
         if (!(is_int($message['v']) || is_float($message['v'])) || (float) $message['v'] < 2) {
             return false;
         }
-        // - iterations, refuse less then 10000 iterations (minimum NIST recommendation)
-        if (!is_int($cipherParams[2]) || $cipherParams[2] <= 10000) {
+
+        // Make sure some fields are base64 data:
+        // - cipher text
+        if (!($ct = base64_decode($message['ct'], true))) {
             return false;
         }
-        // - key size
-        if (!in_array($cipherParams[3], array(128, 192, 256), true)) {
-            return false;
-        }
-        // - tag size
-        if (!in_array($cipherParams[4], array(64, 96, 128), true)) {
-            return false;
+
+        if ($cipherParams[5] === 'aes') {
+            // - initialization vector
+            if (!base64_decode($cipherParams[0], true)) {
+                return false;
+            }
+            // - salt
+            if (!base64_decode($cipherParams[1], true)) {
+                return false;
+            }
+
+            // Make sure some fields have a reasonable size:
+            // - initialization vector
+            if (strlen($cipherParams[0]) > 24) {
+                return false;
+            }
+            // - salt
+            if (strlen($cipherParams[1]) > 14) {
+                return false;
+            }
+
+            // - iterations, refuse less then 10000 iterations (minimum NIST recommendation)
+            if (!is_int($cipherParams[2]) || $cipherParams[2] <= 10000) {
+                return false;
+            }
+            // - key size
+            if (!in_array($cipherParams[3], array(128, 192, 256), true)) {
+                return false;
+            }
+            // - tag size
+            if (!in_array($cipherParams[4], array(64, 96, 128), true)) {
+                return false;
+            }
+            // - mode
+            if (!in_array($cipherParams[6], array('ctr', 'cbc', 'gcm'), true)) {
+                return false;
+            }
         }
         // - algorithm, must be AES
-        if ($cipherParams[5] !== 'aes') {
-            return false;
-        }
-        // - mode
-        if (!in_array($cipherParams[6], array('ctr', 'cbc', 'gcm'), true)) {
+        else if ($cipherParams[5] !== 'age') {
             return false;
         }
         // - compression
