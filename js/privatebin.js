@@ -46,6 +46,9 @@ jQuery.PrivateBin = (function ($) {
     let privateKey;
     let ownPublicKey;
 
+    let pasteDecryptedHash;
+    let currentlyIdMode;
+
     /**
      * zlib library interface
      *
@@ -1386,10 +1389,7 @@ jQuery.PrivateBin = (function ($) {
          * @param  {array}  adata
          * @return {array}  encrypted message in base64 encoding & adata containing encryption spec
          */
-        me.cipher = async function (key, password, message, adata) {
-            const idmode =
-                TopNav.getUseIdentities() && (publicKeys[0] || privateKey);
-
+        me.cipher = async function (key, password, message, adata, idmode) {
             let zlib = await z;
             const compression =
                     typeof zlib === "undefined"
@@ -1472,11 +1472,9 @@ jQuery.PrivateBin = (function ($) {
          * @return {string} decrypted message, empty if decryption failed
          */
         me.decipher = async function (key, password, data) {
-            let adataString, spec, cipherMessage, plaintext;
+            let spec, cipherMessage, plaintext;
             let zlib = await z;
             if (data instanceof Array) {
-                // version 2
-                adataString = JSON.stringify(data[1]);
                 // clone the array instead of passing the reference
                 spec = (
                     data[1][0] instanceof Array ? data[1][0] : data[1]
@@ -1556,6 +1554,15 @@ jQuery.PrivateBin = (function ($) {
          */
         me.base58decode = function (input) {
             return arraybufferToString(base58.decode(input));
+        };
+
+        me.getHashFromString = async function (input) {
+            return arraybufferToString(
+                await crypto.subtle.digest(
+                    "SHA-256",
+                    stringToArraybuffer(input),
+                ),
+            );
         };
 
         return me;
@@ -4510,6 +4517,8 @@ jQuery.PrivateBin = (function ($) {
             $formatter.addClass("hidden");
             $burnAfterReadingOption.addClass("hidden");
             $openDiscussionOption.addClass("hidden");
+            $useIdentitiesOption.addClass("hidden");
+            $useIdentities.addClass("hidden");
             $password.addClass("hidden");
             $attach.addClass("hidden");
 
@@ -5128,7 +5137,7 @@ jQuery.PrivateBin = (function ($) {
          * @function
          * @param {object} cipherMessage
          */
-        me.setCipherMessage = async function (cipherMessage) {
+        me.setCipherMessage = async function (cipherMessage, idmode) {
             if (
                 symmetricKey === null ||
                 (typeof symmetricKey === "string" && symmetricKey === "")
@@ -5143,6 +5152,7 @@ jQuery.PrivateBin = (function ($) {
                 password,
                 JSON.stringify(cipherMessage),
                 data["adata"],
+                idmode,
             );
             data["v"] = 2;
             data["ct"] = cipherResult[0];
@@ -5322,7 +5332,7 @@ jQuery.PrivateBin = (function ($) {
             // prepare server interaction
             ServerInteraction.prepare();
             ServerInteraction.setCryptParameters(
-                Prompt.getPassword(),
+                currentlyIdMode ? pasteDecryptedHash : Prompt.getPassword(),
                 Model.getPasteKey(),
             );
 
@@ -5367,9 +5377,10 @@ jQuery.PrivateBin = (function ($) {
                 cipherMessage["nickname"] = nickname;
             }
 
-            await ServerInteraction.setCipherMessage(cipherMessage).catch(
-                Alert.showError,
-            );
+            await ServerInteraction.setCipherMessage(
+                cipherMessage,
+                false,
+            ).catch(Alert.showError);
             ServerInteraction.run();
         };
 
@@ -5520,9 +5531,10 @@ jQuery.PrivateBin = (function ($) {
             }
 
             // encrypt message
-            await ServerInteraction.setCipherMessage(cipherMessage).catch(
-                Alert.showError,
-            );
+            await ServerInteraction.setCipherMessage(
+                cipherMessage,
+                TopNav.getUseIdentities() && (publicKeys[0] || privateKey),
+            ).catch(Alert.showError);
 
             // send data
             ServerInteraction.run();
@@ -5563,8 +5575,17 @@ jQuery.PrivateBin = (function ($) {
                 cipherdata,
             );
 
+            currentlyIdMode =
+                (cipherdata[1][0] instanceof Array
+                    ? cipherdata[1][0]
+                    : cipherdata[1])[5] === "ageid";
+
             // if it fails, request password
-            if (plaindata.length === 0 && password.length === 0) {
+            if (
+                !currentlyIdMode &&
+                plaindata.length === 0 &&
+                password.length === 0
+            ) {
                 // show prompt
                 Prompt.requestPassword();
 
@@ -5595,13 +5616,21 @@ jQuery.PrivateBin = (function ($) {
          * @return {Promise}
          */
         async function decryptPaste(paste, key, password) {
+            const cipherdata = paste.getCipherData();
             const pastePlain = await decryptOrPromptPassword(
                 key,
                 password,
-                paste.getCipherData(),
+                cipherdata,
             );
+
             if (pastePlain === false) {
-                if (password.length === 0) {
+                if (currentlyIdMode) {
+                    Alert.hideLoading();
+                    // reset password, so it can be re-entered
+                    Prompt.reset();
+                    TopNav.showRetryButton();
+                    throw "Your age key is not on the list here bbg.";
+                } else if (password.length === 0) {
                     throw "waiting on user to provide a password";
                 } else {
                     Alert.hideLoading();
@@ -5610,6 +5639,12 @@ jQuery.PrivateBin = (function ($) {
                     TopNav.showRetryButton();
                     throw "Could not decrypt data. Did you enter a wrong password? Retry with the button at the top.";
                 }
+            }
+
+            if (currentlyIdMode) {
+                pasteDecryptedHash =
+                    await CryptTool.getHashFromString(pastePlain);
+                console.log(pasteDecryptedHash);
             }
 
             const pasteMessage = JSON.parse(pastePlain);
@@ -5702,7 +5737,7 @@ jQuery.PrivateBin = (function ($) {
          * @function
          * @param  {Paste} [paste] - (optional) object including comments to display (items = array with keys ('data','meta'))
          */
-        me.run = function (paste) {
+        me.run = async function (paste) {
             Alert.hideMessages();
             Alert.setCustomHandler(null);
             Alert.showLoading("Decrypting document…", "cloud-download");
@@ -5714,8 +5749,7 @@ jQuery.PrivateBin = (function ($) {
             }
 
             let key = Model.getPasteKey(),
-                password = Prompt.getPassword(),
-                decryptionPromises = [];
+                password = Prompt.getPassword();
 
             TopNav.setRetryCallback(function () {
                 TopNav.hideRetryButton();
@@ -5725,42 +5759,44 @@ jQuery.PrivateBin = (function ($) {
             // Clear attachments to prevent duplicates
             AttachmentViewer.removeAttachment();
 
-            // decrypt paste & attachments
-            decryptionPromises.push(decryptPaste(paste, key, password));
+            try {
+                // shows the remaining time (until) deletion
+                PasteStatus.showRemainingTime(paste);
 
-            // if the discussion is opened on this document, display it
-            if (paste.isDiscussionEnabled()) {
-                decryptionPromises.push(decryptComments(paste, key, password));
-            }
+                CopyToClipboard.showKeyboardShortcutHint();
 
-            // shows the remaining time (until) deletion
-            PasteStatus.showRemainingTime(paste);
-
-            CopyToClipboard.showKeyboardShortcutHint();
-
-            Promise.all(decryptionPromises)
-                .then(() => {
-                    Alert.hideLoading();
-                    TopNav.showViewButtons();
-
-                    // discourage cloning (it cannot really be prevented)
-                    if (paste.isBurnAfterReadingEnabled()) {
-                        TopNav.hideBurnAfterReadingButtons();
-                    } else {
-                        // we have to pass in remaining_time here
-                        TopNav.showEmailButton(paste.getTimeToLive());
-                    }
-
-                    // only offer adding comments, after document was successfully decrypted
+                // decrypt paste & attachments first
+                await decryptPaste(paste, key, password).then(() => {
+                    // if the discussion is opened on this document, display it after main post
                     if (paste.isDiscussionEnabled()) {
-                        DiscussionViewer.finishDiscussion();
+                        decryptComments(
+                            paste,
+                            key,
+                            currentlyIdMode ? pasteDecryptedHash : password,
+                        );
                     }
-                })
-                .catch((err) => {
-                    // wait for the user to type in the password,
-                    // then PasteDecrypter.run will be called again
-                    Alert.showError(err);
                 });
+
+                Alert.hideLoading();
+                TopNav.showViewButtons();
+
+                // discourage cloning (it cannot really be prevented)
+                if (paste.isBurnAfterReadingEnabled()) {
+                    TopNav.hideBurnAfterReadingButtons();
+                } else {
+                    // we have to pass in remaining_time here
+                    TopNav.showEmailButton(paste.getTimeToLive());
+                }
+
+                // only offer adding comments, after document was successfully decrypted
+                if (paste.isDiscussionEnabled()) {
+                    DiscussionViewer.finishDiscussion();
+                }
+            } catch (error) {
+                // wait for the user to type in the password,
+                // then PasteDecrypter.run will be called again
+                Alert.showError(error);
+            }
         };
 
         return me;

@@ -66,7 +66,8 @@
 	display: inline;
 }
 
-#pastelink > a, #plaintext > a {
+#pastelink > a,
+#plaintext > a {
 	word-wrap: break-word;
 }
 
@@ -80,7 +81,9 @@
 	}
 }
 
-#message, .replymessage {
+#message,
+.replymessage,
+#agepublickeys {
 	font-family: monospace;
 	resize: vertical;
 }
