@@ -104,11 +104,11 @@ if (count($class)) {
 				<div class="modal-body modal-body-settings">
 					<div class="form-group">
 						<label for="ageprivatekey">Private Age Key (for decryption):</label>
-						<input id="ageprivatekey" type="password" class="form-control" placeholder="AGE-SECRET-KEY-..."></input>
+						<input id="ageprivatekey" type="password" class="form-control mono" placeholder="AGE-SECRET-KEY-..."></input>
 					</div>
 					<div class="form-group">
 						<label for="agepublickeys">Public Age Keys (for encryption - one per line):</label>
-						<textarea id="agepublickeys" class="form-control" rows="8" placeholder="age1abc123...&#10;age1def456...&#10;age1ghi789..."></textarea>
+						<textarea id="agepublickeys" class="form-control mono" rows="8" placeholder="age1abc123...&#10;age1def456...&#10;age1ghi789..."></textarea>
 					</div>
 				</div>
 				<div class="modal-footer">

@@ -6054,7 +6054,10 @@ jQuery.PrivateBin = (function ($) {
             ownPublicKey = privateKey
                 ? await age.identityToRecipient(privateKey)
                 : null;
-            publicKeys = publicKeysText.split("\n").map((key) => key.trim());
+            publicKeys = publicKeysText
+                .split("\n")
+                .map((key) => key.trim())
+                .filter((key) => key.startsWith("age") && key.length === 62);
 
             if (privateKeyTextArea && privateKeyText) {
                 privateKeyTextArea.val(privateKeyText);
