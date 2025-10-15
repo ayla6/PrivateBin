@@ -45,8 +45,9 @@ jQuery.PrivateBin = (function ($) {
     let publicKeys = [];
     let privateKey;
     let ownPublicKey;
+    let defaultNickname = "";
 
-    let pasteDecryptedHash;
+    let commentsKey;
     let currentlyIdMode;
 
     /**
@@ -1554,15 +1555,6 @@ jQuery.PrivateBin = (function ($) {
          */
         me.base58decode = function (input) {
             return arraybufferToString(base58.decode(input));
-        };
-
-        me.getHashFromString = async function (input) {
-            return arraybufferToString(
-                await crypto.subtle.digest(
-                    "SHA-256",
-                    stringToArraybuffer(input),
-                ),
-            );
         };
 
         return me;
@@ -3742,7 +3734,7 @@ jQuery.PrivateBin = (function ($) {
 
             // clear input
             $replyMessage.val("");
-            $replyNickname.val("");
+            $replyNickname.val(defaultNickname);
 
             // get comment id from source element
             replyCommentId = $source.parent().prop("id").split("_")[1];
@@ -5332,7 +5324,7 @@ jQuery.PrivateBin = (function ($) {
             // prepare server interaction
             ServerInteraction.prepare();
             ServerInteraction.setCryptParameters(
-                currentlyIdMode ? pasteDecryptedHash : Prompt.getPassword(),
+                currentlyIdMode ? commentsKey : Prompt.getPassword(),
                 Model.getPasteKey(),
             );
 
@@ -5453,11 +5445,17 @@ jQuery.PrivateBin = (function ($) {
             PasteViewer.setText(plainText);
             PasteViewer.setFormat(format);
 
+            const idmode =
+                TopNav.getUseIdentities() && (publicKeys[0] || privateKey);
+
             // prepare cypher message
             let attachmentsData = AttachmentViewer.getAttachmentsData(),
                 cipherMessage = {
                     paste: plainText,
                 };
+            if (idmode) {
+                cipherMessage["commentskey"] = CryptTool.getSymmetricKey();
+            }
             if (attachmentsData.length) {
                 cipherMessage["attachment"] = attachmentsData;
                 cipherMessage["attachment_name"] =
@@ -5533,7 +5531,7 @@ jQuery.PrivateBin = (function ($) {
             // encrypt message
             await ServerInteraction.setCipherMessage(
                 cipherMessage,
-                TopNav.getUseIdentities() && (publicKeys[0] || privateKey),
+                idmode,
             ).catch(Alert.showError);
 
             // send data
@@ -5641,13 +5639,13 @@ jQuery.PrivateBin = (function ($) {
                 }
             }
 
-            if (currentlyIdMode) {
-                pasteDecryptedHash =
-                    await CryptTool.getHashFromString(pastePlain);
-                console.log(pasteDecryptedHash);
-            }
-
             const pasteMessage = JSON.parse(pastePlain);
+            if (
+                pasteMessage.hasOwnProperty("commentskey") &&
+                typeof pasteMessage.commentskey === "string"
+            ) {
+                commentsKey = pasteMessage.commentskey;
+            }
             if (
                 pasteMessage.hasOwnProperty("attachment") &&
                 pasteMessage.hasOwnProperty("attachment_name")
@@ -5772,7 +5770,7 @@ jQuery.PrivateBin = (function ($) {
                         decryptComments(
                             paste,
                             key,
-                            currentlyIdMode ? pasteDecryptedHash : password,
+                            currentlyIdMode ? commentsKey : password,
                         );
                     }
                 });
@@ -6067,8 +6065,9 @@ jQuery.PrivateBin = (function ($) {
     const Settings = (function () {
         const me = {};
 
-        let privateKeyTextArea,
+        let privateKeyInput,
             publicKeysTextArea,
+            defaultNicknameInput,
             saveButton,
             settingsButton,
             generateAgeKeyButton,
@@ -6078,14 +6077,16 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Load settings from localStorage
          *
-         * @name SettingsModal.loadSettingsFromStorage
+         * @name Settings.loadSettingsFromStorage
          * @private
          * @function
          */
         async function loadSettingsFromStorage() {
+            const defaultNicknameText = localStorage.getItem("defaultNickname");
             const privateKeyText = localStorage.getItem("privateAgeKey");
             const publicKeysText = localStorage.getItem("publicAgeKeys");
 
+            defaultNickname = defaultNicknameText;
             privateKey = privateKeyText;
             ownPublicKey = privateKey
                 ? await age.identityToRecipient(privateKey)
@@ -6095,28 +6096,28 @@ jQuery.PrivateBin = (function ($) {
                 .map((key) => key.trim())
                 .filter((key) => key.startsWith("age") && key.length === 62);
 
-            if (privateKeyTextArea && privateKeyText) {
-                privateKeyTextArea.val(privateKeyText);
+            if (privateKeyInput) {
+                privateKeyInput.val(privateKeyText);
             }
-            if (publicKeysTextArea && publicKeysText) {
+            if (publicKeysTextArea) {
                 publicKeysTextArea.val(publicKeysText);
+            }
+            if (defaultNicknameInput) {
+                defaultNicknameInput.val(defaultNickname);
             }
         }
 
         /**
          * Save settings to localStorage
          *
-         * @name SettingsModal.saveSettingsToStorage
+         * @name Settings.saveSettingsToStorage
          * @private
          * @function
          */
         async function saveSettingsToStorage() {
-            if (privateKeyTextArea) {
-                localStorage.setItem("privateAgeKey", privateKeyTextArea.val());
-            }
-            if (publicKeysTextArea) {
-                localStorage.setItem("publicAgeKeys", publicKeysTextArea.val());
-            }
+            localStorage.setItem("defaultNickname", defaultNicknameInput.val());
+            localStorage.setItem("privateAgeKey", privateKeyInput.val());
+            localStorage.setItem("publicAgeKeys", publicKeysTextArea.val());
 
             loadSettingsFromStorage();
         }
@@ -6124,7 +6125,7 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Generate a random age key
          *
-         * @name SettingsModal.generateRandomAgeKey
+         * @name Settings.generateRandomAgeKey
          * @private
          * @function
          */
@@ -6140,7 +6141,7 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Copy own public key
          *
-         * @name SettingsModal.copyOwnPublicKey
+         * @name Settings.copyOwnPublicKey
          * @private
          * @function
          */
@@ -6154,7 +6155,7 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Copy own private key
          *
-         * @name SettingsModal.copyOwnPrivateKey
+         * @name Settings.copyOwnPrivateKey
          * @private
          * @function
          */
@@ -6168,7 +6169,7 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Get private age key for decryption
          *
-         * @name SettingsModal.getPrivateKey
+         * @name Settings.getPrivateKey
          * @function
          * @return {string}
          */
@@ -6179,7 +6180,7 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Get list of public keys for encryption
          *
-         * @name SettingsModal.getPublicKeys
+         * @name Settings.getPublicKeys
          * @function
          * @return {Array}
          */
@@ -6191,13 +6192,14 @@ jQuery.PrivateBin = (function ($) {
         /**
          * Initialize
          *
-         * @name SettingsModal.init
+         * @name Settings.init
          * @function
          */
         me.init = function () {
             const modal = $("#settingsmodal");
-            privateKeyTextArea = $("#ageprivatekey");
+            privateKeyInput = $("#ageprivatekey");
             publicKeysTextArea = $("#agepublickeys");
+            defaultNicknameInput = $("#defaultnickname");
 
             generateAgeKeyButton = $("#generateagekey");
             generateAgeKeyButton.on("click", generateRandomAgeKey);

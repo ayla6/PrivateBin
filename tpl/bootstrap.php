@@ -103,6 +103,10 @@ if (count($class)) {
 				</div>
 				<div class="modal-body modal-body-settings">
 					<div class="form-group">
+						<label for="defaultnickname">Default Nickname:</label>
+						<input id="defaultnickname" type="text" class="form-control" placeholder="your mom"></input>
+					</div>
+					<div class="form-group">
 						<label for="ageprivatekey">Private Age Key (for decryption):</label>
 						<input id="ageprivatekey" type="password" class="form-control mono" placeholder="AGE-SECRET-KEY-..."></input>
 					</div>
