@@ -6133,8 +6133,8 @@ jQuery.PrivateBin = (function ($) {
         async function generateRandomAgeKey() {
             const identity = await age.generateIdentity();
 
-            if (privateKeyTextArea) {
-                privateKeyTextArea.val(identity);
+            if (privateKeyInput) {
+                privateKeyInput.val(identity);
             }
         }
 
@@ -6147,7 +6147,7 @@ jQuery.PrivateBin = (function ($) {
          */
 
         async function copyOwnPublicKey() {
-            if (privateKeyTextArea && privateKeyTextArea.val()) {
+            if (privateKeyInput && privateKeyInput.val()) {
                 navigator.clipboard.writeText(ownPublicKey);
             }
         }
@@ -6161,8 +6161,8 @@ jQuery.PrivateBin = (function ($) {
          */
 
         async function copyOwnPrivateKey() {
-            if (privateKeyTextArea && privateKeyTextArea.val()) {
-                navigator.clipboard.writeText(privateKeyTextArea.val());
+            if (privateKeyInput && privateKeyInput.val()) {
+                navigator.clipboard.writeText(privateKeyInput.val());
             }
         }
 
