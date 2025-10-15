@@ -6081,6 +6081,8 @@ jQuery.PrivateBin = (function ($) {
             if (publicKeysTextArea) {
                 localStorage.setItem("publicAgeKeys", publicKeysTextArea.val());
             }
+
+            loadSettingsFromStorage();
         }
 
         /**
