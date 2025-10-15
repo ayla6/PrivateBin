@@ -133,7 +133,7 @@ class Configuration
             "js/prettify.js" =>
                 "sha512-puO0Ogy++IoA2Pb9IjSxV1n4+kQkKXYAEUtVzfZpQepyDPyXk8hokiYDS7ybMogYlyyEIwMLpZqVhCkARQWLMg==",
             "js/privatebin.js" =>
-                "KujjwiosDxyefzn3YHw3t25YUEliMwRIcSLa/A6AwM7+WORLZYkHpINlox6ExsB7mSim+cZmfQZfgZFb2hNTJg==",
+                "sha512-M6+JG9uSdK5YO2Dwk08p9RiJDIowXLFrkQO67usPSQVd7Mu1CUGbTUTpnDb7RNH1TUngccV+v6de1S8eTlT6Kg==",
             "js/purify-3.2.7.js" =>
                 "sha512-2H9wzIiPQCOsh7T3hK/WuqWIwSQ2oYq91doyrp1LcnXuPyxzehopypz16wiWqxmMjx2cVIqAWCoRp1gNZAsFEQ==",
             "js/showdown-2.1.0.js" =>
