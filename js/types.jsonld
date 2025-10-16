@@ -55,7 +55,7 @@
 	},
 	"Algorithm": {
 		"@type": "so:Text",
-		"@value": ["age", "ageid]
+		"@value": ["aes", "age-aes"]
 	},
 	"Mode": {
 		"@type": "so:Text",

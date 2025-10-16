@@ -30,7 +30,7 @@ class Controller
      *
      * @const string
      */
-    const VERSION = "0.0.6";
+    const VERSION = "7";
 
     /**
      * minimal required PHP version
@@ -299,7 +299,7 @@ class Controller
         }
         $sizelimit = $this->_conf->getKey("sizelimit");
         // Ensure content is not too big.
-        if (strlen($data["ct"]) > $sizelimit) {
+        if (strlen($data["ct"]) > $sizelimit || strlen(Json::encode($data)) > $sizelimit) {
             $this->_return_message(
                 1,
                 I18n::_(

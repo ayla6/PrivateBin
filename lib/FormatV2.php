@@ -34,11 +34,18 @@ class FormatV2
     public static function isValid(&$message, $isComment = false)
     {
         $required_keys = ["adata", "v", "ct"];
+
+        $cipherParams = $isComment ? $message["adata"] : $message["adata"][0];
+
         if ($isComment) {
             $required_keys[] = "pasteid";
             $required_keys[] = "parentid";
         } else {
             $required_keys[] = "meta";
+        }
+
+        if ($cipherParams[5] === "age-aes") {
+            $required_keys[] = "keyfile";
         }
 
         // Make sure no additionnal keys were added.
@@ -58,8 +65,6 @@ class FormatV2
             return false;
         }
 
-        $cipherParams = $isComment ? $message["adata"] : $message["adata"][0];
-
         // Make sure some fields contain no unsupported values:
         // - version
         if (!(is_int($message["v"]) || is_float($message["v"])) || (float) $message["v"] < 2) {
@@ -71,9 +76,42 @@ class FormatV2
         if (!($ct = base64_decode($message["ct"], true))) {
             return false;
         }
+        // - keyfile
+        if ($cipherParams[5] === "age-aes" && !($ct = base64_decode($message["ct"], true))) {
+            return false;
+        }
+        // - salt
+        if (!base64_decode($cipherParams[1], true)) {
+            return false;
+        }
+        // - cipher text
+        if (!($ct = base64_decode($message["ct"], true))) {
+            return false;
+        }
 
-        // - algorithm, must be age
-        if (!($cipherParams[5] === "age" || $cipherParams[5] === "ageid")) {
+        // Make sure some fields contain no unsupported values:
+        // - version
+        if (!(is_int($message["v"]) || is_float($message["v"])) || (float) $message["v"] < 2) {
+            return false;
+        }
+        // - iterations, refuse less then 10000 iterations (minimum NIST recommendation)
+        if (!is_int($cipherParams[2]) || $cipherParams[2] <= 10000) {
+            return false;
+        }
+        // - key size
+        if (!in_array($cipherParams[3], [128, 192, 256], true)) {
+            return false;
+        }
+        // - tag size
+        if (!in_array($cipherParams[4], [64, 96, 128], true)) {
+            return false;
+        }
+        // - algorithm, must be AES
+        if (!in_array($cipherParams[5], ["aes", "age-aes"], true)) {
+            return false;
+        }
+        // - mode
+        if (!in_array($cipherParams[6], ["ctr", "cbc", "gcm"], true)) {
             return false;
         }
         // - compression

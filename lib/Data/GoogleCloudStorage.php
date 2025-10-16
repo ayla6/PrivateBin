@@ -41,7 +41,7 @@ class GoogleCloudStorage extends AbstractData
      * @access private
      * @var    string
      */
-    private $_prefix = 'pastes';
+    private $_prefix = "pastes";
 
     /**
      * bucket acl type
@@ -59,22 +59,22 @@ class GoogleCloudStorage extends AbstractData
      */
     public function __construct(array $options)
     {
-        if (getenv('PRIVATEBIN_GCS_BUCKET')) {
-            $bucket = getenv('PRIVATEBIN_GCS_BUCKET');
+        if (getenv("PRIVATEBIN_GCS_BUCKET")) {
+            $bucket = getenv("PRIVATEBIN_GCS_BUCKET");
         }
-        if (array_key_exists('bucket', $options)) {
-            $bucket = $options['bucket'];
+        if (array_key_exists("bucket", $options)) {
+            $bucket = $options["bucket"];
         }
-        if (array_key_exists('prefix', $options)) {
-            $this->_prefix = $options['prefix'];
+        if (array_key_exists("prefix", $options)) {
+            $this->_prefix = $options["prefix"];
         }
-        if (array_key_exists('uniformacl', $options)) {
-            $this->_uniformacl = $options['uniformacl'];
+        if (array_key_exists("uniformacl", $options)) {
+            $this->_uniformacl = $options["uniformacl"];
         }
 
-        $this->_client = class_exists('StorageClientStub', false) ?
-            new \StorageClientStub(array()) :
-            new StorageClient(array('suppressKeyFileNotice' => true));
+        $this->_client = class_exists("StorageClientStub", false)
+            ? new \StorageClientStub([])
+            : new StorageClient(["suppressKeyFileNotice" => true]);
         if (isset($bucket)) {
             $this->_bucket = $this->_client->bucket($bucket);
         }
@@ -89,8 +89,8 @@ class GoogleCloudStorage extends AbstractData
      */
     private function _getKey($pasteid)
     {
-        if ($this->_prefix != '') {
-            return $this->_prefix . '/' . $pasteid;
+        if ($this->_prefix != "") {
+            return $this->_prefix . "/" . $pasteid;
         }
         return $pasteid;
     }
@@ -106,27 +106,33 @@ class GoogleCloudStorage extends AbstractData
      */
     private function _upload($key, &$payload)
     {
-        $metadata = array_key_exists('meta', $payload) ? $payload['meta'] : array();
-        unset($metadata['salt']);
+        $metadata = array_key_exists("meta", $payload) ? $payload["meta"] : [];
+        unset($metadata["salt"]);
         foreach ($metadata as $k => $v) {
             $metadata[$k] = strval($v);
         }
         try {
-            $data = array(
-                'name'          => $key,
-                'chunkSize'     => 262144,
-                'metadata'      => array(
-                    'content-type' => 'application/json',
-                    'metadata'     => $metadata,
-                ),
-            );
+            $data = [
+                "name" => $key,
+                "chunkSize" => 262144,
+                "metadata" => [
+                    "content-type" => "application/json",
+                    "metadata" => $metadata,
+                ],
+            ];
             if (!$this->_uniformacl) {
-                $data['predefinedAcl'] = 'private';
+                $data["predefinedAcl"] = "private";
             }
             $this->_bucket->upload(Json::encode($payload), $data);
         } catch (Exception $e) {
-            error_log('failed to upload ' . $key . ' to ' . $this->_bucket->name() . ', ' .
-                trim(preg_replace('/\s\s+/', ' ', $e->getMessage())));
+            error_log(
+                "failed to upload " .
+                    $key .
+                    " to " .
+                    $this->_bucket->name() .
+                    ", " .
+                    trim(preg_replace("/\s\s+/", " ", $e->getMessage())),
+            );
             return false;
         }
         return true;
@@ -150,14 +156,20 @@ class GoogleCloudStorage extends AbstractData
     public function read($pasteid)
     {
         try {
-            $o    = $this->_bucket->object($this->_getKey($pasteid));
+            $o = $this->_bucket->object($this->_getKey($pasteid));
             $data = $o->downloadAsString();
             return Json::decode($data);
         } catch (NotFoundException $e) {
             return false;
         } catch (Exception $e) {
-            error_log('failed to read ' . $pasteid . ' from ' . $this->_bucket->name() . ', ' .
-                trim(preg_replace('/\s\s+/', ' ', $e->getMessage())));
+            error_log(
+                "failed to read " .
+                    $pasteid .
+                    " from " .
+                    $this->_bucket->name() .
+                    ", " .
+                    trim(preg_replace("/\s\s+/", " ", $e->getMessage())),
+            );
             return false;
         }
     }
@@ -170,7 +182,7 @@ class GoogleCloudStorage extends AbstractData
         $name = $this->_getKey($pasteid);
 
         try {
-            foreach ($this->_bucket->objects(array('prefix' => $name . '/discussion/')) as $comment) {
+            foreach ($this->_bucket->objects(["prefix" => $name . "/discussion/"]) as $comment) {
                 try {
                     $this->_bucket->object($comment->name())->delete();
                 } catch (NotFoundException $e) {
@@ -205,7 +217,7 @@ class GoogleCloudStorage extends AbstractData
         if ($this->existsComment($pasteid, $parentid, $commentid)) {
             return false;
         }
-        $key = $this->_getKey($pasteid) . '/discussion/' . $parentid . '/' . $commentid;
+        $key = $this->_getKey($pasteid) . "/discussion/" . $parentid . "/" . $commentid;
         return $this->_upload($key, $comment);
     }
 
@@ -214,14 +226,15 @@ class GoogleCloudStorage extends AbstractData
      */
     public function readComments($pasteid)
     {
-        $comments = array();
-        $prefix   = $this->_getKey($pasteid) . '/discussion/';
+        $comments = [];
+        $prefix = $this->_getKey($pasteid) . "/discussion/";
         try {
-            foreach ($this->_bucket->objects(array('prefix' => $prefix)) as $key) {
-                $data            = $this->_bucket->object($key->name())->downloadAsString();
-                $comment         = Json::decode($data);
-                $comment['id']   = basename($key->name());
-                $slot            = $this->getOpenSlot($comments, (int) $comment['meta']['created']);
+            foreach ($this->_bucket->objects(["prefix" => $prefix]) as $key) {
+                $data = $this->_bucket->object($key->name())->downloadAsString();
+                $comment = Json::decode($data);
+                $comment["id"] = basename($key->name());
+                unset($comment["parentid"]);
+                $slot = $this->getOpenSlot($comments, (int) $comment["meta"]["created"]);
                 $comments[$slot] = $comment;
             }
         } catch (NotFoundException $e) {
@@ -235,8 +248,8 @@ class GoogleCloudStorage extends AbstractData
      */
     public function existsComment($pasteid, $parentid, $commentid)
     {
-        $name = $this->_getKey($pasteid) . '/discussion/' . $parentid . '/' . $commentid;
-        $o    = $this->_bucket->object($name);
+        $name = $this->_getKey($pasteid) . "/discussion/" . $parentid . "/" . $commentid;
+        $o = $this->_bucket->object($name);
         return $o->exists();
     }
 
@@ -245,16 +258,16 @@ class GoogleCloudStorage extends AbstractData
      */
     public function purgeValues($namespace, $time)
     {
-        $path = 'config/' . $namespace;
+        $path = "config/" . $namespace;
         try {
-            foreach ($this->_bucket->objects(array('prefix' => $path)) as $object) {
+            foreach ($this->_bucket->objects(["prefix" => $path]) as $object) {
                 $name = $object->name();
-                if (strlen($name) > strlen($path) && substr($name, strlen($path), 1) !== '/') {
+                if (strlen($name) > strlen($path) && substr($name, strlen($path), 1) !== "/") {
                     continue;
                 }
                 $info = $object->info();
-                if (key_exists('metadata', $info) && key_exists('value', $info['metadata'])) {
-                    $value = $info['metadata']['value'];
+                if (key_exists("metadata", $info) && key_exists("value", $info["metadata"])) {
+                    $value = $info["metadata"]["value"];
                     if (is_numeric($value) && intval($value) < $time) {
                         try {
                             $object->delete();
@@ -274,34 +287,40 @@ class GoogleCloudStorage extends AbstractData
      * namespaces traffic_limiter and purge_limiter.
      * @inheritDoc
      */
-    public function setValue($value, $namespace, $key = '')
+    public function setValue($value, $namespace, $key = "")
     {
-        if ($key === '') {
-            $key = 'config/' . $namespace;
+        if ($key === "") {
+            $key = "config/" . $namespace;
         } else {
-            $key = 'config/' . $namespace . '/' . $key;
+            $key = "config/" . $namespace . "/" . $key;
         }
 
-        $metadata = array('namespace' => $namespace);
-        if ($namespace != 'salt') {
-            $metadata['value'] = strval($value);
+        $metadata = ["namespace" => $namespace];
+        if ($namespace != "salt") {
+            $metadata["value"] = strval($value);
         }
         try {
-            $data = array(
-                'name'          => $key,
-                'chunkSize'     => 262144,
-                'metadata'      => array(
-                    'content-type' => 'application/json',
-                    'metadata'     => $metadata,
-                ),
-            );
+            $data = [
+                "name" => $key,
+                "chunkSize" => 262144,
+                "metadata" => [
+                    "content-type" => "application/json",
+                    "metadata" => $metadata,
+                ],
+            ];
             if (!$this->_uniformacl) {
-                $data['predefinedAcl'] = 'private';
+                $data["predefinedAcl"] = "private";
             }
             $this->_bucket->upload($value, $data);
         } catch (Exception $e) {
-            error_log('failed to set key ' . $key . ' to ' . $this->_bucket->name() . ', ' .
-                trim(preg_replace('/\s\s+/', ' ', $e->getMessage())));
+            error_log(
+                "failed to set key " .
+                    $key .
+                    " to " .
+                    $this->_bucket->name() .
+                    ", " .
+                    trim(preg_replace("/\s\s+/", " ", $e->getMessage())),
+            );
             return false;
         }
         return true;
@@ -310,18 +329,18 @@ class GoogleCloudStorage extends AbstractData
     /**
      * @inheritDoc
      */
-    public function getValue($namespace, $key = '')
+    public function getValue($namespace, $key = "")
     {
-        if ($key === '') {
-            $key = 'config/' . $namespace;
+        if ($key === "") {
+            $key = "config/" . $namespace;
         } else {
-            $key = 'config/' . $namespace . '/' . $key;
+            $key = "config/" . $namespace . "/" . $key;
         }
         try {
             $o = $this->_bucket->object($key);
             return $o->downloadAsString();
         } catch (NotFoundException $e) {
-            return '';
+            return "";
         }
     }
 
@@ -330,18 +349,18 @@ class GoogleCloudStorage extends AbstractData
      */
     protected function _getExpiredPastes($batchsize)
     {
-        $expired = array();
+        $expired = [];
 
-        $now    = time();
+        $now = time();
         $prefix = $this->_prefix;
-        if ($prefix != '') {
-            $prefix .= '/';
+        if ($prefix != "") {
+            $prefix .= "/";
         }
         try {
-            foreach ($this->_bucket->objects(array('prefix' => $prefix)) as $object) {
-                $metadata = $object->info()['metadata'];
-                if ($metadata != null && array_key_exists('expire_date', $metadata)) {
-                    $expire_at = intval($metadata['expire_date']);
+            foreach ($this->_bucket->objects(["prefix" => $prefix]) as $object) {
+                $metadata = $object->info()["metadata"];
+                if ($metadata != null && array_key_exists("expire_date", $metadata)) {
+                    $expire_at = intval($metadata["expire_date"]);
                     if ($expire_at != 0 && $expire_at < $now) {
                         array_push($expired, basename($object->name()));
                     }
@@ -362,16 +381,16 @@ class GoogleCloudStorage extends AbstractData
      */
     public function getAllPastes()
     {
-        $pastes = array();
+        $pastes = [];
         $prefix = $this->_prefix;
-        if ($prefix != '') {
-            $prefix .= '/';
+        if ($prefix != "") {
+            $prefix .= "/";
         }
 
         try {
-            foreach ($this->_bucket->objects(array('prefix' => $prefix)) as $object) {
+            foreach ($this->_bucket->objects(["prefix" => $prefix]) as $object) {
                 $candidate = substr($object->name(), strlen($prefix));
-                if (!str_contains($candidate, '/')) {
+                if (!str_contains($candidate, "/")) {
                     $pastes[] = $candidate;
                 }
             }

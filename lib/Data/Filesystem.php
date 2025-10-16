@@ -33,24 +33,28 @@ class Filesystem extends AbstractData
      * @link  https://man7.org/linux/man-pages/man7/glob.7.html
      * @const string
      */
-    const PASTE_FILE_PATTERN = DIRECTORY_SEPARATOR . '[a-f0-9][a-f0-9]' .
-        DIRECTORY_SEPARATOR . '[a-f0-9][a-f0-9]' . DIRECTORY_SEPARATOR .
-        '[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]' .
-        '[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*';
+    const PASTE_FILE_PATTERN =
+        DIRECTORY_SEPARATOR .
+        "[a-f0-9][a-f0-9]" .
+        DIRECTORY_SEPARATOR .
+        "[a-f0-9][a-f0-9]" .
+        DIRECTORY_SEPARATOR .
+        "[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]" .
+        "[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*";
 
     /**
      * first line in paste or comment files, to protect their contents from browsing exposed data directories
      *
      * @const string
      */
-    const PROTECTION_LINE = '<?php http_response_code(403); /*';
+    const PROTECTION_LINE = "<?php http_response_code(403); /*";
 
     /**
      * line in generated .htaccess files, to protect exposed directories from being browsable on apache web servers
      *
      * @const string
      */
-    const HTACCESS_LINE = 'Require all denied';
+    const HTACCESS_LINE = "Require all denied";
 
     /**
      * path in which to persist something
@@ -58,7 +62,7 @@ class Filesystem extends AbstractData
      * @access private
      * @var    string
      */
-    private $_path = 'data';
+    private $_path = "data";
 
     /**
      * instantiates a new Filesystem data backend
@@ -69,8 +73,8 @@ class Filesystem extends AbstractData
     public function __construct(array $options)
     {
         // if given update the data directory
-        if (array_key_exists('dir', $options)) {
-            $this->_path = $options['dir'];
+        if (array_key_exists("dir", $options)) {
+            $this->_path = $options["dir"];
         }
     }
 
@@ -85,7 +89,7 @@ class Filesystem extends AbstractData
     public function create($pasteid, array &$paste)
     {
         $storagedir = $this->_dataid2path($pasteid);
-        $file       = $storagedir . $pasteid . '.php';
+        $file = $storagedir . $pasteid . ".php";
         if (is_file($file)) {
             return false;
         }
@@ -106,7 +110,7 @@ class Filesystem extends AbstractData
     {
         if (
             !$this->exists($pasteid) ||
-            !$paste = $this->_get($this->_dataid2path($pasteid) . $pasteid . '.php')
+            !($paste = $this->_get($this->_dataid2path($pasteid) . $pasteid . ".php"))
         ) {
             return false;
         }
@@ -124,8 +128,8 @@ class Filesystem extends AbstractData
         $pastedir = $this->_dataid2path($pasteid);
         if (is_dir($pastedir)) {
             // Delete the paste itself.
-            if (is_file($pastedir . $pasteid . '.php')) {
-                unlink($pastedir . $pasteid . '.php');
+            if (is_file($pastedir . $pasteid . ".php")) {
+                unlink($pastedir . $pasteid . ".php");
             }
 
             // Delete discussion if it exists.
@@ -153,8 +157,8 @@ class Filesystem extends AbstractData
      */
     public function exists($pasteid)
     {
-        $basePath  = $this->_dataid2path($pasteid) . $pasteid;
-        $pastePath = $basePath . '.php';
+        $basePath = $this->_dataid2path($pasteid) . $pasteid;
+        $pastePath = $basePath . ".php";
         // convert to PHP protected files if needed
         if (is_readable($basePath)) {
             $this->_prependRename($basePath, $pastePath);
@@ -164,8 +168,8 @@ class Filesystem extends AbstractData
             if (is_dir($discdir)) {
                 $dir = dir($discdir);
                 while (false !== ($filename = $dir->read())) {
-                    if (substr($filename, -4) !== '.php' && strlen($filename) >= 16) {
-                        $commentFilename = $discdir . $filename . '.php';
+                    if (substr($filename, -4) !== ".php" && strlen($filename) >= 16) {
+                        $commentFilename = $discdir . $filename . ".php";
                         $this->_prependRename($discdir . $filename, $commentFilename);
                     }
                 }
@@ -188,7 +192,7 @@ class Filesystem extends AbstractData
     public function createComment($pasteid, $parentid, $commentid, array &$comment)
     {
         $storagedir = $this->_dataid2discussionpath($pasteid);
-        $file       = $storagedir . $pasteid . '.' . $commentid . '.' . $parentid . '.php';
+        $file = $storagedir . $pasteid . "." . $commentid . "." . $parentid . ".php";
         if (is_file($file)) {
             return false;
         }
@@ -207,8 +211,8 @@ class Filesystem extends AbstractData
      */
     public function readComments($pasteid)
     {
-        $comments = array();
-        $discdir  = $this->_dataid2discussionpath($pasteid);
+        $comments = [];
+        $discdir = $this->_dataid2discussionpath($pasteid);
         if (is_dir($discdir)) {
             $dir = dir($discdir);
             while (false !== ($filename = $dir->read())) {
@@ -218,16 +222,13 @@ class Filesystem extends AbstractData
                 // - parentid is the comment this comment replies to (It can be pasteid)
                 if (is_file($discdir . $filename)) {
                     $comment = $this->_get($discdir . $filename);
-                    $items   = explode('.', $filename);
+                    $items = explode(".", $filename);
                     // Add some meta information not contained in file.
-                    $comment['id']       = $items[1];
-                    $comment['parentid'] = $items[2];
+                    $comment["id"] = $items[1];
+                    unset($comment["parentid"]);
 
                     // Store in array
-                    $key            = $this->getOpenSlot(
-                        $comments,
-                        $comment['meta']['created']
-                    );
+                    $key = $this->getOpenSlot($comments, $comment["meta"]["created"]);
                     $comments[$key] = $comment;
                 }
             }
@@ -252,7 +253,12 @@ class Filesystem extends AbstractData
     {
         return is_file(
             $this->_dataid2discussionpath($pasteid) .
-            $pasteid . '.' . $commentid . '.' . $parentid . '.php'
+                $pasteid .
+                "." .
+                $commentid .
+                "." .
+                $parentid .
+                ".php",
         );
     }
 
@@ -265,26 +271,34 @@ class Filesystem extends AbstractData
      * @param  string $key
      * @return bool
      */
-    public function setValue($value, $namespace, $key = '')
+    public function setValue($value, $namespace, $key = "")
     {
         switch ($namespace) {
-            case 'purge_limiter':
-                opcache_invalidate($this->_path . DIRECTORY_SEPARATOR . 'purge_limiter.php');
+            case "purge_limiter":
+                opcache_invalidate($this->_path . DIRECTORY_SEPARATOR . "purge_limiter.php");
                 return $this->_storeString(
-                    $this->_path . DIRECTORY_SEPARATOR . 'purge_limiter.php',
-                    '<?php' . PHP_EOL . '$GLOBALS[\'purge_limiter\'] = ' . var_export($value, true) . ';'
+                    $this->_path . DIRECTORY_SEPARATOR . "purge_limiter.php",
+                    "<?php" .
+                        PHP_EOL .
+                        '$GLOBALS[\'purge_limiter\'] = ' .
+                        var_export($value, true) .
+                        ";",
                 );
-            case 'salt':
+            case "salt":
                 return $this->_storeString(
-                    $this->_path . DIRECTORY_SEPARATOR . 'salt.php',
-                    '<?php # |' . $value . '|'
+                    $this->_path . DIRECTORY_SEPARATOR . "salt.php",
+                    "<?php # |" . $value . "|",
                 );
-            case 'traffic_limiter':
+            case "traffic_limiter":
                 $this->_last_cache[$key] = $value;
-                opcache_invalidate($this->_path . DIRECTORY_SEPARATOR . 'traffic_limiter.php');
+                opcache_invalidate($this->_path . DIRECTORY_SEPARATOR . "traffic_limiter.php");
                 return $this->_storeString(
-                    $this->_path . DIRECTORY_SEPARATOR . 'traffic_limiter.php',
-                    '<?php' . PHP_EOL . '$GLOBALS[\'traffic_limiter\'] = ' . var_export($this->_last_cache, true) . ';'
+                    $this->_path . DIRECTORY_SEPARATOR . "traffic_limiter.php",
+                    "<?php" .
+                        PHP_EOL .
+                        '$GLOBALS[\'traffic_limiter\'] = ' .
+                        var_export($this->_last_cache, true) .
+                        ";",
                 );
         }
         return false;
@@ -298,33 +312,33 @@ class Filesystem extends AbstractData
      * @param  string $key
      * @return string
      */
-    public function getValue($namespace, $key = '')
+    public function getValue($namespace, $key = "")
     {
         switch ($namespace) {
-            case 'purge_limiter':
-                $file = $this->_path . DIRECTORY_SEPARATOR . 'purge_limiter.php';
+            case "purge_limiter":
+                $file = $this->_path . DIRECTORY_SEPARATOR . "purge_limiter.php";
                 if (is_readable($file)) {
                     require $file;
-                    if (array_key_exists('purge_limiter', $GLOBALS)) {
-                        return $GLOBALS['purge_limiter'];
+                    if (array_key_exists("purge_limiter", $GLOBALS)) {
+                        return $GLOBALS["purge_limiter"];
                     }
                 }
                 break;
-            case 'salt':
-                $file = $this->_path . DIRECTORY_SEPARATOR . 'salt.php';
+            case "salt":
+                $file = $this->_path . DIRECTORY_SEPARATOR . "salt.php";
                 if (is_readable($file)) {
-                    $items = explode('|', file_get_contents($file));
+                    $items = explode("|", file_get_contents($file));
                     if (count($items) == 3) {
                         return $items[1];
                     }
                 }
                 break;
-            case 'traffic_limiter':
-                $file = $this->_path . DIRECTORY_SEPARATOR . 'traffic_limiter.php';
+            case "traffic_limiter":
+                $file = $this->_path . DIRECTORY_SEPARATOR . "traffic_limiter.php";
                 if (is_readable($file)) {
                     require $file;
-                    if (array_key_exists('traffic_limiter', $GLOBALS)) {
-                        $this->_last_cache = $GLOBALS['traffic_limiter'];
+                    if (array_key_exists("traffic_limiter", $GLOBALS)) {
+                        $this->_last_cache = $GLOBALS["traffic_limiter"];
                         if (array_key_exists($key, $this->_last_cache)) {
                             return $this->_last_cache[$key];
                         }
@@ -332,7 +346,7 @@ class Filesystem extends AbstractData
                 }
                 break;
         }
-        return '';
+        return "";
     }
 
     /**
@@ -344,10 +358,7 @@ class Filesystem extends AbstractData
      */
     private function _get($filename)
     {
-        $data = substr(
-            file_get_contents($filename),
-            strlen(self::PROTECTION_LINE . PHP_EOL)
-        );
+        $data = substr(file_get_contents($filename), strlen(self::PROTECTION_LINE . PHP_EOL));
         return Json::decode($data);
     }
 
@@ -360,19 +371,19 @@ class Filesystem extends AbstractData
      */
     protected function _getExpiredPastes($batchsize)
     {
-        $pastes = array();
-        $count  = 0;
+        $pastes = [];
+        $count = 0;
         $opened = 0;
-        $limit  = $batchsize * 10; // try at most 10 times $batchsize pastes before giving up
-        $time   = time();
-        $files  = $this->getAllPastes();
+        $limit = $batchsize * 10; // try at most 10 times $batchsize pastes before giving up
+        $time = time();
+        $files = $this->getAllPastes();
         shuffle($files);
         foreach ($files as $pasteid) {
             if ($this->exists($pasteid)) {
                 $data = $this->read($pasteid);
                 if (
-                    array_key_exists('expire_date', $data['meta']) &&
-                    $data['meta']['expire_date'] < $time
+                    array_key_exists("expire_date", $data["meta"]) &&
+                    $data["meta"]["expire_date"] < $time
                 ) {
                     $pastes[] = $pasteid;
                     if (++$count >= $batchsize) {
@@ -392,10 +403,10 @@ class Filesystem extends AbstractData
      */
     public function getAllPastes()
     {
-        $pastes = array();
+        $pastes = [];
         foreach (new GlobIterator($this->_path . self::PASTE_FILE_PATTERN) as $file) {
             if ($file->isFile()) {
-                $pastes[] = $file->getBasename('.php');
+                $pastes[] = $file->getBasename(".php");
             }
         }
         return $pastes;
@@ -417,9 +428,12 @@ class Filesystem extends AbstractData
      */
     private function _dataid2path($dataid)
     {
-        return $this->_path . DIRECTORY_SEPARATOR .
-            substr($dataid, 0, 2) . DIRECTORY_SEPARATOR .
-            substr($dataid, 2, 2) . DIRECTORY_SEPARATOR;
+        return $this->_path .
+            DIRECTORY_SEPARATOR .
+            substr($dataid, 0, 2) .
+            DIRECTORY_SEPARATOR .
+            substr($dataid, 2, 2) .
+            DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -433,8 +447,7 @@ class Filesystem extends AbstractData
      */
     private function _dataid2discussionpath($dataid)
     {
-        return $this->_dataid2path($dataid) . $dataid .
-            '.discussion' . DIRECTORY_SEPARATOR;
+        return $this->_dataid2path($dataid) . $dataid . ".discussion" . DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -450,10 +463,15 @@ class Filesystem extends AbstractData
         try {
             return $this->_storeString(
                 $filename,
-                self::PROTECTION_LINE . PHP_EOL . Json::encode($data)
+                self::PROTECTION_LINE . PHP_EOL . Json::encode($data),
             );
         } catch (Exception $e) {
-            error_log('Error while trying to store data to the filesystem at path "' . $filename . '": ' . $e->getMessage());
+            error_log(
+                'Error while trying to store data to the filesystem at path "' .
+                    $filename .
+                    '": ' .
+                    $e->getMessage(),
+            );
             return false;
         }
     }
@@ -474,15 +492,11 @@ class Filesystem extends AbstractData
                 return false;
             }
         }
-        $file = $this->_path . DIRECTORY_SEPARATOR . '.htaccess';
+        $file = $this->_path . DIRECTORY_SEPARATOR . ".htaccess";
         if (!is_file($file)) {
             $writtenBytes = 0;
             if ($fileCreated = @touch($file)) {
-                $writtenBytes = @file_put_contents(
-                    $file,
-                    self::HTACCESS_LINE . PHP_EOL,
-                    LOCK_EX
-                );
+                $writtenBytes = @file_put_contents($file, self::HTACCESS_LINE . PHP_EOL, LOCK_EX);
             }
             if (
                 $fileCreated === false ||
@@ -493,7 +507,7 @@ class Filesystem extends AbstractData
             }
         }
 
-        $fileCreated  = true;
+        $fileCreated = true;
         $writtenBytes = 0;
         if (!is_file($filename)) {
             $fileCreated = @touch($filename);
@@ -520,7 +534,7 @@ class Filesystem extends AbstractData
     {
         // don't overwrite already converted file
         if (!is_readable($destFile)) {
-            $handle = fopen($srcFile, 'r', false, stream_context_create());
+            $handle = fopen($srcFile, "r", false, stream_context_create());
             file_put_contents($destFile, self::PROTECTION_LINE . PHP_EOL);
             file_put_contents($destFile, $handle, FILE_APPEND);
             fclose($handle);

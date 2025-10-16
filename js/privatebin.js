@@ -47,7 +47,6 @@ jQuery.PrivateBin = (function ($) {
     let ownPublicKey;
     let defaultNickname = "";
 
-    let commentsKey;
     let currentlyIdMode;
 
     /**
@@ -256,7 +255,11 @@ jQuery.PrivateBin = (function ($) {
          * @return {Array}
          */
         this.getCipherData = function () {
-            return [this.ct, this.adata];
+            return {
+                ct: this.ct,
+                keyfile: this.keyfile,
+                adata: this.adata,
+            };
         };
     }
 
@@ -1379,12 +1382,86 @@ jQuery.PrivateBin = (function ($) {
         }
 
         /**
+         * derive cryptographic key from key string and password
+         *
+         * @name   CryptTool.deriveKey
+         * @async
+         * @function
+         * @private
+         * @param  {string} key
+         * @param  {string} password
+         * @param  {array}  spec cryptographic specification
+         * @return {CryptoKey} derived key
+         */
+        async function deriveKey(key, password, spec) {
+            let keyArray = stringToArraybuffer(key);
+            if (password.length > 0) {
+                let passwordArray = stringToArraybuffer(password),
+                    newKeyArray = new Uint8Array(
+                        keyArray.length + passwordArray.length,
+                    );
+                newKeyArray.set(keyArray, 0);
+                newKeyArray.set(passwordArray, keyArray.length);
+                keyArray = newKeyArray;
+            }
+
+            // import raw key
+            const importedKey = await window.crypto.subtle
+                .importKey(
+                    "raw", // only 'raw' is allowed
+                    keyArray,
+                    { name: "PBKDF2" }, // we use PBKDF2 for key derivation
+                    false, // the key may not be exported
+                    ["deriveKey"], // we may only use it for key derivation
+                )
+                .catch(Alert.showError);
+
+            // derive a stronger key for use with AES
+            return window.crypto.subtle
+                .deriveKey(
+                    {
+                        name: "PBKDF2", // we use PBKDF2 for key derivation
+                        salt: stringToArraybuffer(spec[1]), // salt used in HMAC
+                        iterations: spec[2], // amount of iterations to apply
+                        hash: { name: "SHA-256" }, // can be "SHA-1", "SHA-256", "SHA-384" or "SHA-512"
+                    },
+                    importedKey,
+                    {
+                        name: "AES-" + spec[6].toUpperCase(), // can be any supported AES algorithm ("AES-CTR", "AES-CBC", "AES-CMAC", "AES-GCM", "AES-CFB", "AES-KW", "ECDH", "DH" or "HMAC")
+                        length: spec[3], // can be 128, 192 or 256
+                    },
+                    false, // the key may not be exported
+                    ["encrypt", "decrypt"], // we may only use it for en- and decryption
+                )
+                .catch(Alert.showError);
+        }
+
+        /**
+         * gets crypto settings from specification and authenticated data
+         *
+         * @name   CryptTool.cryptoSettings
+         * @function
+         * @private
+         * @param  {string} adata authenticated data
+         * @param  {array}  spec cryptographic specification
+         * @return {object} crypto settings
+         */
+        function cryptoSettings(adata, spec) {
+            return {
+                name: "AES-" + spec[6].toUpperCase(), // can be any supported AES algorithm ("AES-CTR", "AES-CBC", "AES-CMAC", "AES-GCM", "AES-CFB", "AES-KW", "ECDH", "DH" or "HMAC")
+                iv: stringToArraybuffer(spec[0]), // the initialization vector you used to encrypt
+                additionalData: stringToArraybuffer(adata), // the addtional data you used during encryption (if any)
+                tagLength: spec[4], // the length of the tag you used to encrypt (if any)
+            };
+        }
+
+        /**
          * compress, then encrypt message with given key and password
          *
          * @name   CryptTool.cipher
          * @async
          * @function
-         * @param  {string} key
+         * @param  {string} keycipher
          * @param  {string} password
          * @param  {string} message
          * @param  {array}  adata
@@ -1397,13 +1474,13 @@ jQuery.PrivateBin = (function ($) {
                         ? "none" // client lacks support for WASM
                         : $("body").data("compression") || "zlib",
                 spec = [
-                    null, // initialization vector
-                    null, // salt
-                    null, // iterations
-                    null, // key size
-                    null, // tag size
-                    idmode ? "ageid" : "age", // algorithm
-                    null, // algorithm mode
+                    getRandomBytes(16), // initialization vector
+                    getRandomBytes(8), // salt
+                    100000, // iterations
+                    256, // key size
+                    128, // tag size
+                    idmode ? "age-aes" : "aes", // algorithm
+                    "gcm", // algorithm mode
                     compression, // compression
                 ],
                 encodedSpec = [];
@@ -1419,46 +1496,36 @@ jQuery.PrivateBin = (function ($) {
             }
 
             // finally, encrypt message
-            const e = new age.Encrypter();
+            let keyfile;
             if (idmode) {
-                const e2 = new age.Encrypter();
+                const e = new age.Encrypter();
                 if (publicKeys[0]) {
                     for (let i = 0; i < publicKeys.length; ++i) {
-                        e2.addRecipient(publicKeys[i]);
+                        e.addRecipient(publicKeys[i]);
                     }
                 }
-                e2.addRecipient(ownPublicKey);
-                message = btoa(
+                e.addRecipient(ownPublicKey);
+                keyfile = btoa(
                     arraybufferToString(
-                        await e2
-                            .encrypt(
-                                new Uint8Array(
-                                    compress(message, compression, zlib),
-                                ),
-                            )
-                            .catch(Alert.showError),
+                        await e.encrypt(password).catch(Alert.showError),
                     ),
                 );
             }
-            e.setPassphrase(idmode ? key : key + password);
-            return [
-                btoa(
+            return {
+                message: btoa(
                     arraybufferToString(
-                        await e
+                        await window.crypto.subtle
                             .encrypt(
-                                new Uint8Array(
-                                    compress(
-                                        message,
-                                        idmode ? null : compression,
-                                        zlib,
-                                    ),
-                                ),
+                                cryptoSettings(JSON.stringify(adata), spec),
+                                await deriveKey(key, password, spec),
+                                await compress(message, compression, zlib),
                             )
                             .catch(Alert.showError),
                     ),
                 ),
+                keyfile,
                 adata,
-            ];
+            };
         };
 
         /**
@@ -1473,14 +1540,16 @@ jQuery.PrivateBin = (function ($) {
          * @return {string} decrypted message, empty if decryption failed
          */
         me.decipher = async function (key, password, data) {
-            let spec, cipherMessage, plaintext;
+            let adataString, spec, cipherMessage, plaintext;
             let zlib = await z;
-            if (data instanceof Array) {
+            if (data instanceof Object) {
+                // version 2
+                adataString = JSON.stringify(data.adata);
                 // clone the array instead of passing the reference
                 spec = (
-                    data[1][0] instanceof Array ? data[1][0] : data[1]
+                    data.adata[0] instanceof Array ? data.adata[0] : data.adata
                 ).slice();
-                cipherMessage = data[0];
+                cipherMessage = data.ct;
             } else {
                 throw "unsupported message format";
             }
@@ -1492,21 +1561,20 @@ jQuery.PrivateBin = (function ($) {
                 }
             }
             try {
-                const d = new age.Decrypter();
-                d.addPassphrase(key + password);
-                plaintext = await d.decrypt(
-                    stringToArraybuffer(atob(cipherMessage)),
-                );
-
-                if (spec[5] === "ageid") {
-                    const d2 = new age.Decrypter();
-                    d2.addIdentity(privateKey);
-                    plaintext = await d2.decrypt(
-                        stringToArraybuffer(
-                            atob(arraybufferToString(plaintext)),
-                        ),
+                if (data.keyfile) {
+                    const d = new age.Decrypter();
+                    d.addIdentity(privateKey);
+                    password = await d.decrypt(
+                        stringToArraybuffer(atob(data.keyfile)),
+                        "text",
                     );
                 }
+
+                plaintext = await window.crypto.subtle.decrypt(
+                    cryptoSettings(adataString, spec),
+                    await deriveKey(key, password, spec),
+                    stringToArraybuffer(atob(cipherMessage)),
+                );
             } catch (err) {
                 console.error(err);
                 return "";
@@ -4510,7 +4578,6 @@ jQuery.PrivateBin = (function ($) {
             $burnAfterReadingOption.addClass("hidden");
             $openDiscussionOption.addClass("hidden");
             $useIdentitiesOption.addClass("hidden");
-            $useIdentities.addClass("hidden");
             $password.addClass("hidden");
             $attach.addClass("hidden");
 
@@ -5147,8 +5214,9 @@ jQuery.PrivateBin = (function ($) {
                 idmode,
             );
             data["v"] = 2;
-            data["ct"] = cipherResult[0];
-            data["adata"] = cipherResult[1];
+            data["ct"] = cipherResult.message;
+            data["adata"] = cipherResult.adata;
+            if (cipherResult.keyfile) data["keyfile"] = cipherResult.keyfile;
         };
 
         /**
@@ -5324,7 +5392,7 @@ jQuery.PrivateBin = (function ($) {
             // prepare server interaction
             ServerInteraction.prepare();
             ServerInteraction.setCryptParameters(
-                currentlyIdMode ? commentsKey : Prompt.getPassword(),
+                Prompt.getPassword(),
                 Model.getPasteKey(),
             );
 
@@ -5364,6 +5432,10 @@ jQuery.PrivateBin = (function ($) {
             // prepare cypher message
             let cipherMessage = {
                 comment: plainText,
+                parentid:
+                    typeof parentid === "undefined"
+                        ? Model.getPasteId()
+                        : parentid,
             };
             if (nickname.length > 0) {
                 cipherMessage["nickname"] = nickname;
@@ -5409,9 +5481,14 @@ jQuery.PrivateBin = (function ($) {
                 return;
             }
 
+            const idmode =
+                TopNav.getUseIdentities() && (publicKeys[0] || privateKey);
+
             // prepare server interaction
             ServerInteraction.prepare();
-            ServerInteraction.setCryptParameters(TopNav.getPassword());
+            ServerInteraction.setCryptParameters(
+                idmode ? CryptTool.getSymmetricKey() : TopNav.getPassword(),
+            );
 
             // set success/fail functions
             ServerInteraction.setSuccess(showCreatedPaste);
@@ -5445,17 +5522,11 @@ jQuery.PrivateBin = (function ($) {
             PasteViewer.setText(plainText);
             PasteViewer.setFormat(format);
 
-            const idmode =
-                TopNav.getUseIdentities() && (publicKeys[0] || privateKey);
-
             // prepare cypher message
             let attachmentsData = AttachmentViewer.getAttachmentsData(),
                 cipherMessage = {
                     paste: plainText,
                 };
-            if (idmode) {
-                cipherMessage["commentskey"] = CryptTool.getSymmetricKey();
-            }
             if (attachmentsData.length) {
                 cipherMessage["attachment"] = attachmentsData;
                 cipherMessage["attachment_name"] =
@@ -5533,7 +5604,6 @@ jQuery.PrivateBin = (function ($) {
                 cipherMessage,
                 idmode,
             ).catch(Alert.showError);
-
             // send data
             ServerInteraction.run();
         };
@@ -5573,10 +5643,7 @@ jQuery.PrivateBin = (function ($) {
                 cipherdata,
             );
 
-            currentlyIdMode =
-                (cipherdata[1][0] instanceof Array
-                    ? cipherdata[1][0]
-                    : cipherdata[1])[5] === "ageid";
+            currentlyIdMode = !!cipherdata.keyfile;
 
             // if it fails, request password
             if (
@@ -5641,12 +5708,6 @@ jQuery.PrivateBin = (function ($) {
 
             const pasteMessage = JSON.parse(pastePlain);
             if (
-                pasteMessage.hasOwnProperty("commentskey") &&
-                typeof pasteMessage.commentskey === "string"
-            ) {
-                commentsKey = pasteMessage.commentskey;
-            }
-            if (
                 pasteMessage.hasOwnProperty("attachment") &&
                 pasteMessage.hasOwnProperty("attachment_name")
             ) {
@@ -5704,24 +5765,21 @@ jQuery.PrivateBin = (function ($) {
                 paste.comments[i] = comment;
                 commentDecryptionPromises.push(
                     commentPromise.then(function (commentJson) {
-                        const commentMessage = JSON.parse(commentJson);
-                        return [
-                            commentMessage.comment || "",
-                            commentMessage.nickname || "",
-                        ];
+                        return JSON.parse(commentJson);
                     }),
                 );
             }
             return Promise.all(commentDecryptionPromises).then(
                 function (plaintexts) {
                     for (let i = 0; i < paste.comments.length; ++i) {
-                        if (plaintexts[i][0].length === 0) {
+                        if (plaintexts[i].comment.length === 0) {
                             continue;
                         }
+                        paste.comments[i].parentid = plaintexts[i].parentid;
                         DiscussionViewer.addComment(
                             paste.comments[i],
-                            plaintexts[i][0],
-                            plaintexts[i][1],
+                            plaintexts[i].comment || "",
+                            plaintexts[i].nickname || "",
                         );
                     }
                 },
@@ -5767,11 +5825,7 @@ jQuery.PrivateBin = (function ($) {
                 await decryptPaste(paste, key, password).then(() => {
                     // if the discussion is opened on this document, display it after main post
                     if (paste.isDiscussionEnabled()) {
-                        decryptComments(
-                            paste,
-                            key,
-                            currentlyIdMode ? commentsKey : password,
-                        );
+                        decryptComments(paste, key, password);
                     }
                 });
 
