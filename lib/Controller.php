@@ -30,7 +30,7 @@ class Controller
      *
      * @const string
      */
-    const VERSION = "0.0.1";
+    const VERSION = "0.0.2";
 
     /**
      * minimal required PHP version
