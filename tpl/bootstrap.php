@@ -615,6 +615,7 @@ if (!$isCpct): ?>
 					<div role="alert" class="alert alert-success">
 						<span class="glyphicon glyphicon-ok" aria-hidden="true"></span>
 						<div id="pastelink"></div>
+						<div id="passwordbutton"></div>
 					</div>
 <?php if (!empty($URLSHORTENER)): ?>
 					<p>

@@ -2381,6 +2381,50 @@ jQuery.PrivateBin = (function ($) {
         };
 
         /**
+         * creates a notification after a successful id mode document upload, letting you copy the password
+         *
+         * @name   PasteStatus.createPasswordNotification
+         * @function
+         * @param  {string} password
+         */
+        me.createPasswordNotification = function (password) {
+            const passwordButton = $("#passwordbutton");
+            const copyPasswordText = I18n._("Copy password");
+            const copiedText = I18n._("Copied!");
+
+            // create a button to copy the password
+            const copyButton = $(
+                '<button type="button" class="btn btn-default"></button>',
+            )
+                .text(copyPasswordText)
+                .click(function () {
+                    navigator.clipboard.writeText(password).then(
+                        function () {
+                            copyButton.text(copiedText);
+                            setTimeout(function () {
+                                copyButton.text(copyPasswordText);
+                            }, 2000);
+                        },
+                        function (err) {
+                            console.error("Failed to copy password: ", err);
+                            Alert.showError(
+                                "Failed to copy password to clipboard.",
+                            );
+                        },
+                    );
+                });
+
+            // display the notification
+            passwordButton.text(
+                I18n._(
+                    "People without a key can still unlock it using this password: ",
+                ) + " ",
+            );
+            passwordButton.append(copyButton);
+            $pasteSuccess.removeClass("hidden");
+        };
+
+        /**
          * Checks if auto-shortening is enabled and sends the link to the shortener if it is.
          *
          * @name  PasteStatus.checkAutoShorten
@@ -5006,7 +5050,8 @@ jQuery.PrivateBin = (function ($) {
             symmetricKey = null,
             url,
             data,
-            password;
+            password,
+            idMode;
 
         /**
          * public variable ('constant') for errors to prevent magic numbers
@@ -5048,6 +5093,8 @@ jQuery.PrivateBin = (function ($) {
             if (successFunc !== null) {
                 // add useful data to result
                 result.encryptionKey = symmetricKey;
+                result.idMode = idMode;
+                result.password = idMode ? password : null;
                 successFunc(status, result);
             }
         }
@@ -5118,6 +5165,17 @@ jQuery.PrivateBin = (function ($) {
          */
         me.setUrl = function (newUrl) {
             url = newUrl;
+        };
+
+        /**
+         * set id mode
+         *
+         * @name   ServerInteraction.setIdMode
+         * @function
+         * @param {boolean} idMode
+         */
+        me.setIdMode = function (mode) {
+            idMode = mode;
         };
 
         /**
@@ -5196,7 +5254,7 @@ jQuery.PrivateBin = (function ($) {
          * @function
          * @param {object} cipherMessage
          */
-        me.setCipherMessage = async function (cipherMessage, idmode) {
+        me.setCipherMessage = async function (cipherMessage) {
             if (
                 symmetricKey === null ||
                 (typeof symmetricKey === "string" && symmetricKey === "")
@@ -5211,7 +5269,7 @@ jQuery.PrivateBin = (function ($) {
                 password,
                 JSON.stringify(cipherMessage),
                 data["adata"],
-                idmode,
+                idMode,
             );
             data["v"] = 2;
             data["ct"] = cipherResult.message;
@@ -5315,6 +5373,10 @@ jQuery.PrivateBin = (function ($) {
                     "&deletetoken=" +
                     data.deletetoken;
             PasteStatus.createPasteNotification(url, deleteUrl);
+
+            if (data.password) {
+                PasteStatus.createPasswordNotification(data.password);
+            }
 
             // show new URL in browser bar
             history.pushState({ type: "newpaste" }, document.title, url);
@@ -5486,8 +5548,11 @@ jQuery.PrivateBin = (function ($) {
 
             // prepare server interaction
             ServerInteraction.prepare();
+            ServerInteraction.setIdMode(idmode);
             ServerInteraction.setCryptParameters(
-                idmode ? CryptTool.getSymmetricKey() : TopNav.getPassword(),
+                idmode
+                    ? btoa(CryptTool.getSymmetricKey())
+                    : TopNav.getPassword(),
             );
 
             // set success/fail functions
@@ -5600,10 +5665,9 @@ jQuery.PrivateBin = (function ($) {
             }
 
             // encrypt message
-            await ServerInteraction.setCipherMessage(
-                cipherMessage,
-                idmode,
-            ).catch(Alert.showError);
+            await ServerInteraction.setCipherMessage(cipherMessage).catch(
+                Alert.showError,
+            );
             // send data
             ServerInteraction.run();
         };
@@ -5643,14 +5707,8 @@ jQuery.PrivateBin = (function ($) {
                 cipherdata,
             );
 
-            currentlyIdMode = !!cipherdata.keyfile;
-
             // if it fails, request password
-            if (
-                !currentlyIdMode &&
-                plaindata.length === 0 &&
-                password.length === 0
-            ) {
+            if (plaindata.length === 0 && password.length === 0) {
                 // show prompt
                 Prompt.requestPassword();
 

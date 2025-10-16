@@ -220,7 +220,14 @@ p:not(:has(> *:nth-child(2))):has(.hidden) {
 
 .alert {
 	margin-bottom: 10px;
-	:last-child {
+	&:last-child {
 		margin-bottom: 0;
 	}
+	#passwordbutton {
+		margin-top: 10px;
+	}
+}
+
+#pastelink > a {
+	color: #047;
 }
