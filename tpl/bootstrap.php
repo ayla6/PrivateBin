@@ -513,6 +513,17 @@ if (!$isCpct): ?>
 			</div>
 		<?php if ($isCpct): ?></div><?php endif; ?></nav>
 		<main>
+			<section class="mainsection">
+			<section class="container">
+				<div id="noscript" role="alert" class="alert alert-info noscript-hide">
+					<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+					<?php echo I18n::_("Loading…"); ?><br />
+					<span class="small"><?php echo I18n::_(
+     	'In case this message never disappears please have a look at <a href="%s">this FAQ for information to troubleshoot</a>.',
+     	"https://github.com/PrivateBin/PrivateBin/wiki/FAQ#why-does-the-loading-message-not-go-away",
+     ); ?></span>
+				</div>
+			</section>
 			<section class="container">
 <?php if (!empty($NOTICE)): ?>
 				<div role="alert" class="alert alert-info">
@@ -676,21 +687,14 @@ if (!$isCpct): ?>
 					</p>
 				</article>
 			</section>
+			</section>
+			<section class="commentsection">
 			<section class="container">
 				<div id="discussion" class="hidden">
 					<h4><?php echo I18n::_("Discussion"); ?></h4>
 					<div id="commentcontainer"></div>
 				</div>
 			</section>
-			<section class="container">
-				<div id="noscript" role="alert" class="alert alert-info noscript-hide">
-					<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
-					<?php echo I18n::_("Loading…"); ?><br />
-					<span class="small"><?php echo I18n::_(
-     	'In case this message never disappears please have a look at <a href="%s">this FAQ for information to troubleshoot</a>.',
-     	"https://github.com/PrivateBin/PrivateBin/wiki/FAQ#why-does-the-loading-message-not-go-away",
-     ); ?></span>
-				</div>
 			</section>
 		</main>
 		<div id="serverdata" class="hidden" aria-hidden="true">

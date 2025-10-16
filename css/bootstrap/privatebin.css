@@ -101,12 +101,36 @@ li.L8 {
 	color: #fff;
 }
 
+main {
+	display: flex;
+	flex-direction: column;
+}
+
+.mainsection {
+	width: 100%;
+}
+
 /* address 2K or 4K monitors when using bootstrap 3 */
 @media (min-width: 1280px) {
 	.container {
 		width: 100%;
+		padding-left: 0;
+		padding-right: 0;
+	}
+	main {
 		padding-left: 4ch;
 		padding-right: 4ch;
+	}
+	main:not(:has(#discussion.hidden)) {
+		flex-direction: row;
+		gap: 4ch;
+
+		.mainsection {
+			width: 60%;
+		}
+		.commentsection {
+			width: 40%;
+		}
 	}
 }
 
@@ -184,4 +208,19 @@ html[dir="rtl"] #prettyMessageCopyBtn {
 	display: flex;
 	flex-direction: column;
 	align-items: normal;
+}
+
+#discussion {
+	margin-bottom: 20px;
+}
+
+p:not(:has(> *:nth-child(2))):has(.hidden) {
+	display: none;
+}
+
+.alert {
+	margin-bottom: 10px;
+	:last-child {
+		margin-bottom: 0;
+	}
 }
