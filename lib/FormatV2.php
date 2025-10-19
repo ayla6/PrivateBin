@@ -42,6 +42,8 @@ class FormatV2
             $required_keys[] = "parentid";
         } else {
             $required_keys[] = "meta";
+            $required_keys[] = "secretid";
+            $required_keys[] = "encryptedsecretid";
         }
 
         if ($cipherParams[5] === "age-aes") {

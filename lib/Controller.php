@@ -30,7 +30,7 @@ class Controller
      *
      * @const string
      */
-    const VERSION = "0.0.2";
+    const VERSION = "0.0.3";
 
     /**
      * minimal required PHP version
@@ -45,6 +45,13 @@ class Controller
      * @const string
      */
     const GENERIC_ERROR = "Document does not exist, has expired or has been deleted.";
+
+    /**
+     * show the error if the secretid is wrong
+     *
+     * @const string
+     */
+    const SECRETID_ERROR = "Secret ID is wrong.";
 
     /**
      * configuration
@@ -158,7 +165,10 @@ class Controller
                 );
                 break;
             case "read":
-                $this->_read($this->_request->getParam("pasteid"));
+                $this->_read(
+                    $this->_request->getParam("pasteid"),
+                    $this->_request->getParam("secretid"),
+                );
                 break;
             case "jsonld":
                 $this->_jsonld($this->_request->getParam("jsonld"));
@@ -396,8 +406,9 @@ class Controller
      *
      * @access private
      * @param  string $dataid
+     * @param  string $secretid
      */
-    private function _read($dataid)
+    private function _read($dataid, $secretid)
     {
         if (!$this->_request->isJsonApiCall()) {
             return;
@@ -407,10 +418,32 @@ class Controller
             $paste = $this->_model->getPaste($dataid);
             if ($paste->exists()) {
                 $data = $paste->get();
-                if (array_key_exists("salt", $data["meta"])) {
-                    unset($data["meta"]["salt"]);
+                if ($secretid || !array_key_exists("secretid", $data)) {
+                    if (
+                        !array_key_exists("secretid", $data) ||
+                        hash_equals($data["secretid"], $secretid)
+                    ) {
+                        if (array_key_exists("salt", $data["meta"])) {
+                            unset($data["meta"]["salt"]);
+                        }
+
+                        unset($data["encryptedsecretid"]);
+                        unset($data["secretid"]);
+
+                        $this->_return_message(0, $dataid, (array) $data);
+                    } else {
+                        $this->_return_message(1, self::SECRETID_ERROR);
+                    }
+                } else {
+                    $response = [
+                        "adata" => array_replace($data["adata"][0], [7 => "none"]),
+                        "ct" => $data["encryptedsecretid"],
+                    ];
+                    if (array_key_exists("keyfile", $data)) {
+                        $response["keyfile"] = $data["keyfile"];
+                    }
+                    $this->_return_message(0, $dataid, $response);
                 }
-                $this->_return_message(0, $dataid, (array) $data);
             } else {
                 $this->_return_message(1, self::GENERIC_ERROR);
             }

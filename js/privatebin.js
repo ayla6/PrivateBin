@@ -67,10 +67,11 @@ jQuery.PrivateBin = (function ($) {
             html: true,
         },
     };
+
     /* https://github.com/mary-ext/pkg-exif-rm/blob/trunk/mod.ts */
     /**
      * Removes EXIF information from PNG, JPEG and WebP images
-     * @returns A new image buffer with EXIF removed, will return `null` if
+     * @return A new image buffer with EXIF removed, will return `null` if
      *   image is unsupported, or if there's nothing to remove.
      */
     function removeExif(buf) {
@@ -1190,7 +1191,7 @@ jQuery.PrivateBin = (function ($) {
          * @function
          * @private
          * @param {string} messageId
-         * @returns {boolean}
+         * @return {boolean}
          */
         function isStringContainsHtml(messageId) {
             // An integer which specifies the type of the node. An Element node like <p> or <div>.
@@ -1467,7 +1468,14 @@ jQuery.PrivateBin = (function ($) {
          * @param  {array}  adata
          * @return {array}  encrypted message in base64 encoding & adata containing encryption spec
          */
-        me.cipher = async function (key, password, message, adata, idmode) {
+        me.cipher = async function (
+            key,
+            password,
+            message,
+            adata,
+            idmode,
+            ispost,
+        ) {
             let zlib = await z;
             const compression =
                     typeof zlib === "undefined"
@@ -1511,13 +1519,39 @@ jQuery.PrivateBin = (function ($) {
                     ),
                 );
             }
+
+            const derivedKey = await deriveKey(key, password, spec);
+
+            let secretid;
+            let encryptedsecretid;
+            if (ispost) {
+                const adataClone = adata[0].slice();
+                adataClone[7] = "none";
+
+                secretid = CryptTool.base58encode(getRandomBytes(32));
+                encryptedsecretid = btoa(
+                    arraybufferToString(
+                        await window.crypto.subtle
+                            .encrypt(
+                                cryptoSettings(
+                                    JSON.stringify(adataClone),
+                                    spec,
+                                ),
+                                derivedKey,
+                                await compress(secretid, "none", zlib),
+                            )
+                            .catch(Alert.showError),
+                    ),
+                );
+            }
+
             return {
                 message: btoa(
                     arraybufferToString(
                         await window.crypto.subtle
                             .encrypt(
                                 cryptoSettings(JSON.stringify(adata), spec),
-                                await deriveKey(key, password, spec),
+                                derivedKey,
                                 await compress(message, compression, zlib),
                             )
                             .catch(Alert.showError),
@@ -1525,6 +1559,8 @@ jQuery.PrivateBin = (function ($) {
                 ),
                 keyfile,
                 adata,
+                secretid,
+                encryptedsecretid,
             };
         };
 
@@ -1640,6 +1676,7 @@ jQuery.PrivateBin = (function ($) {
         let id = null,
             pasteData = null,
             symmetricKey = null,
+            secretid = null,
             $templates;
 
         /**
@@ -1658,10 +1695,46 @@ jQuery.PrivateBin = (function ($) {
          *
          * @name   Model.getFormatDefault
          * @function
+         * @param {function} callback (optional) Called when data is available
          * @return string
          */
         me.getFormatDefault = function () {
             return $("#pasteFormatter").val();
+        };
+
+        /**
+         * @name Model.getIdCheck
+         * @function
+         * @param {function} callback (optional) Called when data is available
+         *
+         * @return string
+         */
+        me.getIdCheck = function (callback) {
+            ServerInteraction.prepare();
+            ServerInteraction.setUrl(
+                Helper.baseUri() + "?pasteid=" + me.getPasteId(),
+            );
+
+            ServerInteraction.setFailure(function (status, data) {
+                // revert loading status…
+                Alert.hideLoading();
+                TopNav.showViewButtons();
+
+                // show error message
+                Alert.showError(
+                    ServerInteraction.parseUploadError(
+                        status,
+                        data,
+                        "get document data",
+                    ),
+                );
+            });
+            ServerInteraction.setSuccess(function (status, data) {
+                if (typeof callback === "function") {
+                    return callback(undefined, data);
+                }
+            });
+            ServerInteraction.run();
         };
 
         /**
@@ -1689,7 +1762,11 @@ jQuery.PrivateBin = (function ($) {
             // reload data
             ServerInteraction.prepare();
             ServerInteraction.setUrl(
-                Helper.baseUri() + "?pasteid=" + me.getPasteId(),
+                Helper.baseUri() +
+                    "?pasteid=" +
+                    me.getPasteId() +
+                    "&secretid=" +
+                    me.getPasteSecretId(),
             );
 
             ServerInteraction.setFailure(function (status, data) {
@@ -1763,6 +1840,24 @@ jQuery.PrivateBin = (function ($) {
          */
         me.hasDeleteToken = function () {
             return window.location.search.indexOf("deletetoken") !== -1;
+        };
+
+        /**
+         * @name Model.setPasteSecretId
+         * @function
+         * @param {string} secretid
+         */
+        me.setPasteSecretId = function (id) {
+            secretid = id;
+        };
+
+        /**
+         * @name Model.getPasteSecretId
+         * @function
+         * @return {string} secretid
+         */
+        me.getPasteSecretId = function () {
+            return secretid;
         };
 
         /**
@@ -3428,7 +3523,7 @@ jQuery.PrivateBin = (function ($) {
          *
          * @name   AttachmentViewer.getAttachments
          * @function
-         * @returns {array}
+         * @return {array}
          */
         me.getAttachments = function () {
             return [...$attachment.find("a")].map((link) => [
@@ -5051,7 +5146,8 @@ jQuery.PrivateBin = (function ($) {
             url,
             data,
             password,
-            idMode;
+            idMode,
+            isPost;
 
         /**
          * public variable ('constant') for errors to prevent magic numbers
@@ -5179,6 +5275,17 @@ jQuery.PrivateBin = (function ($) {
         };
 
         /**
+         * set if it is a post request
+         *
+         * @name   ServerInteraction.setIsPost
+         * @function
+         * @param {boolean} isPost
+         */
+        me.setIsPost = function (isIt) {
+            isPost = isIt;
+        };
+
+        /**
          * sets the password to use (first value) and optionally also the
          * encryption key (not recommended, it is automatically generated).
          *
@@ -5270,11 +5377,16 @@ jQuery.PrivateBin = (function ($) {
                 JSON.stringify(cipherMessage),
                 data["adata"],
                 idMode,
+                isPost,
             );
             data["v"] = 2;
             data["ct"] = cipherResult.message;
             data["adata"] = cipherResult.adata;
             if (cipherResult.keyfile) data["keyfile"] = cipherResult.keyfile;
+            if (cipherResult.secretid) {
+                data["secretid"] = cipherResult.secretid;
+                data["encryptedsecretid"] = cipherResult.encryptedsecretid;
+            }
         };
 
         /**
@@ -5549,6 +5661,7 @@ jQuery.PrivateBin = (function ($) {
             // prepare server interaction
             ServerInteraction.prepare();
             ServerInteraction.setIdMode(idmode);
+            ServerInteraction.setIsPost(true);
             ServerInteraction.setCryptParameters(
                 idmode
                     ? btoa(CryptTool.getSymmetricKey())
@@ -5714,7 +5827,7 @@ jQuery.PrivateBin = (function ($) {
 
                 // Thus, we cannot do anything yet, we need to wait for the user
                 // input.
-                return false;
+                return -1;
             }
 
             // if all tries failed, we can only return an error
@@ -5723,6 +5836,30 @@ jQuery.PrivateBin = (function ($) {
             }
 
             return plaindata;
+        }
+
+        /**
+         * decrypt the id check
+         *
+         * @name   PasteDecrypter.decryptIdCheck
+         * @private
+         * @async
+         * @function
+         * @param  {Object} idcheck - id check in data form
+         * @param  {string} key
+         * @param  {string} password
+         * @throws {string}
+         * @return {Promise}
+         */
+        async function decryptIdCheck(cipherdata, key, password) {
+            const idPlain = await decryptOrPromptPassword(
+                key,
+                password,
+                cipherdata,
+            );
+
+            Model.setPasteSecretId(idPlain);
+            return idPlain;
         }
 
         /**
@@ -5740,7 +5877,7 @@ jQuery.PrivateBin = (function ($) {
          */
         async function decryptPaste(paste, key, password) {
             const cipherdata = paste.getCipherData();
-            const pastePlain = await decryptOrPromptPassword(
+            const pastePlain = await CryptTool.decipher(
                 key,
                 password,
                 cipherdata,
@@ -5851,14 +5988,13 @@ jQuery.PrivateBin = (function ($) {
          * @function
          * @param  {Paste} [paste] - (optional) object including comments to display (items = array with keys ('data','meta'))
          */
-        me.run = async function (paste) {
+        me.run = async function (paste, secretid) {
             Alert.hideMessages();
             Alert.setCustomHandler(null);
             Alert.showLoading("Decrypting document…", "cloud-download");
 
-            if (typeof paste === "undefined" || paste.type === "click") {
-                // get cipher data and wait until it is available
-                Model.getPasteData(me.run);
+            if (typeof secretid === "undefined") {
+                Model.getIdCheck(me.run);
                 return;
             }
 
@@ -5867,8 +6003,22 @@ jQuery.PrivateBin = (function ($) {
 
             TopNav.setRetryCallback(function () {
                 TopNav.hideRetryButton();
-                me.run(paste);
+                me.run(paste, secretid);
             });
+
+            const res = await decryptIdCheck(secretid, key, password);
+
+            if (res === -1) return;
+            else if (res === false) {
+                Alert.showError("Invalid password");
+                return;
+            }
+
+            if (typeof paste === "undefined" || paste.type === "click") {
+                // get cipher data and wait until it is available
+                Model.getPasteData((paste) => me.run(paste, secretid));
+                return;
+            }
 
             // Clear attachments to prevent duplicates
             AttachmentViewer.removeAttachment();
@@ -5983,7 +6133,7 @@ jQuery.PrivateBin = (function ($) {
          * @name CopyToClipboard.isUserSelectedTextToCopy
          * @private
          * @function
-         * @returns {boolean}
+         * @return {boolean}
          */
         function isUserSelectedTextToCopy() {
             let text = "";
@@ -6441,7 +6591,11 @@ jQuery.PrivateBin = (function ($) {
             Model.getPasteData(function (data) {
                 ServerInteraction.prepare();
                 ServerInteraction.setUrl(
-                    Helper.baseUri() + "?pasteid=" + Model.getPasteId(),
+                    Helper.baseUri() +
+                        "?pasteid=" +
+                        Model.getPasteId() +
+                        "&secretid=" +
+                        Model.getPasteSecretId(),
                 );
 
                 ServerInteraction.setFailure(function (status, data) {

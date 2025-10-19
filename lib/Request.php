@@ -125,6 +125,7 @@ class Request
                         "jsonld" => FILTER_SANITIZE_SPECIAL_CHARS,
                         "link" => FILTER_SANITIZE_URL,
                         "pasteid" => FILTER_SANITIZE_SPECIAL_CHARS,
+                        "secretid" => FILTER_SANITIZE_SPECIAL_CHARS,
                         "shortenviayourls" => FILTER_SANITIZE_SPECIAL_CHARS,
                         "shortenviashlink" => FILTER_SANITIZE_SPECIAL_CHARS,
                     ],
@@ -195,6 +196,11 @@ class Request
         $keyfile = $this->getParam("keyfile");
         if ($keyfile) {
             $data["keyfile"] = $keyfile;
+        }
+        $secretid = $this->getParam("secretid");
+        if ($secretid) {
+            $data["secretid"] = $secretid;
+            $data["encryptedsecretid"] = $this->getParam("encryptedsecretid");
         }
         $meta = $this->getParam("meta");
         if (empty($meta)) {
